@@ -7,6 +7,8 @@ export default function RootLayout() {
     <LibraryProvider>
       <Stack screenOptions={{ headerStyle: { backgroundColor: theme.background }, headerTintColor: theme.ink, headerShadowVisible: false, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="source/edit" options={{ title: '书源信息' }} />
+        <Stack.Screen name="source/import" options={{ title: '导入书源' }} />
         <Stack.Screen name="book/[sourceId]/[bookId]" options={{ title: '书籍详情' }} />
         <Stack.Screen name="reader/[sourceId]/[bookId]/[chapterId]" options={{ title: '阅读' }} />
       </Stack>

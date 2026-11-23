@@ -9,7 +9,7 @@ const isId = (value: unknown): value is string => isText(value) && /^[a-z0-9][a-
 export function parseStaticSource(input: string): StaticSourceDocument {
   let raw: unknown;
   try {
-    raw = JSON.parse(input);
+    raw = JSON.parse(input.replace(/^\uFEFF/, ''));
   } catch {
     throw new Error('JSON 格式无效，请检查标点和引号。');
   }
@@ -18,6 +18,9 @@ export function parseStaticSource(input: string): StaticSourceDocument {
   }
   if (!isId(raw.id)) {
     throw new Error('书源 id 只能包含字母、数字、下划线和短横线。');
+  }
+  if (raw.description !== undefined && typeof raw.description !== 'string') {
+    throw new Error('书源说明 description 必须是文字。');
   }
   if (!Array.isArray(raw.books) || !Array.isArray(raw.chapters)) {
     throw new Error('书源需要 books 和 chapters 数组。');
@@ -43,7 +46,10 @@ export function parseStaticSource(input: string): StaticSourceDocument {
     if (chapterIds.has(key)) throw new Error(`重复的章节 id：${key}`);
     chapterIds.add(key);
   }
-  return raw as StaticSourceDocument;
+  return {
+    version: 1, id: raw.id, name: raw.name.trim(), description: raw.description ?? '',
+    books: raw.books, chapters: raw.chapters,
+  } as StaticSourceDocument;
 }
 
 export function createStaticAdapter(document: StaticSourceDocument, kind: SourceInfo['kind']): SourceAdapter {

@@ -12,19 +12,22 @@ export default function ReaderScreen() {
   const [book, setBook] = useState<Book | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [chapters, setChapters] = useState<ChapterMeta[]>([]);
+  const [resolved, setResolved] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let active = true;
     if (source) {
       Promise.all([source.getBook(bookId), source.getChapter(bookId, chapterId), source.getChapters(bookId)]).then(([nextBook, nextChapter, nextChapters]) => {
-        if (active) { setBook(nextBook); setChapter(nextChapter); setChapters(nextChapters); }
-      });
+        if (active) { setBook(nextBook); setChapter(nextChapter); setChapters(nextChapters); setResolved(true); setLoadError(''); }
+      }).catch(() => { if (active) { setLoadError('章节加载失败，请返回后重试。'); setResolved(true); } });
     }
     return () => { active = false; };
   }, [source, bookId, chapterId]);
 
   if (!source) return <View style={styles.center}><Text>书源不可用。请重新导入书源。</Text></View>;
-  if (!chapter) return <View style={styles.center}><Text>正在加载章节…</Text></View>;
+  if (loadError) return <View style={styles.center}><Text>{loadError}</Text></View>;
+  if (!chapter) return <View style={styles.center}><Text>{resolved ? '章节已不存在，可能已被书源修改或移除。' : '正在加载章节…'}</Text></View>;
   const index = chapters.findIndex((item) => item.id === chapter.id);
   const next = chapters[index + 1];
 

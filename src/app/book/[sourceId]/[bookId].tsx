@@ -11,19 +11,23 @@ export default function BookScreen() {
   const source = getSource(sourceId);
   const [book, setBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<ChapterMeta[]>([]);
+  const [shelfError, setShelfError] = useState('');
+  const [resolved, setResolved] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let active = true;
     if (source) {
       Promise.all([source.getBook(bookId), source.getChapters(bookId)]).then(([nextBook, nextChapters]) => {
-        if (active) { setBook(nextBook); setChapters(nextChapters); }
-      });
+        if (active) { setBook(nextBook); setChapters(nextChapters); setResolved(true); setLoadError(''); }
+      }).catch(() => { if (active) { setLoadError('书籍加载失败，请返回后重试。'); setResolved(true); } });
     }
     return () => { active = false; };
   }, [source, bookId]);
 
   if (!source) return <View style={styles.center}><Text>未找到书源。请返回书源页重新导入。</Text></View>;
-  if (!book) return <View style={styles.center}><Text>正在加载书籍…</Text></View>;
+  if (loadError) return <View style={styles.center}><Text>{loadError}</Text></View>;
+  if (!book) return <View style={styles.center}><Text>{resolved ? '书籍已不存在，可能已被书源修改或移除。' : '正在加载书籍…'}</Text></View>;
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
@@ -35,8 +39,9 @@ export default function BookScreen() {
       <Text style={styles.summary}>{book.summary}</Text>
       <View style={styles.actions}>
         {chapters[0] && <Link href={{ pathname: '/reader/[sourceId]/[bookId]/[chapterId]', params: { sourceId, bookId, chapterId: chapters[0].id } }} asChild><Pressable style={styles.readButton}><Text style={styles.readText}>开始阅读</Text></Pressable></Link>}
-        <Pressable style={styles.shelfButton} onPress={() => toggleShelf(book)}><Text style={styles.shelfText}>{isOnShelf(book) ? '✓ 已在书架' : '+ 加入书架'}</Text></Pressable>
+        <Pressable style={styles.shelfButton} onPress={() => { setShelfError(''); toggleShelf(book).catch(error => setShelfError(error.message)); }}><Text style={styles.shelfText}>{isOnShelf(book) ? '✓ 已在书架' : '+ 加入书架'}</Text></Pressable>
       </View>
+      {shelfError ? <Text accessibilityRole="alert" style={styles.summary}>{shelfError}</Text> : null}
       <View style={styles.chapterHeading}><Text style={styles.sectionTitle}>目录</Text><Text style={styles.count}>共 {chapters.length} 章</Text></View>
       {chapters.map((chapter) => (
         <Link key={chapter.id} href={{ pathname: '/reader/[sourceId]/[bookId]/[chapterId]', params: { sourceId, bookId, chapterId: chapter.id } }} asChild>

@@ -7,7 +7,7 @@ import { Book } from '../../domain/books';
 import { useLibrary } from '../../state/library';
 
 export default function DiscoverScreen() {
-  const { sources } = useLibrary();
+  const { enabledSources: sources } = useLibrary();
   const [query, setQuery] = useState('');
   const [books, setBooks] = useState<Book[]>([]);
   const [error, setError] = useState('');
@@ -25,7 +25,8 @@ export default function DiscoverScreen() {
   return (
     <Page title="发现好书" eyebrow="DISCOVER STORIES">
       <View style={styles.search}><Text style={styles.icon}>⌕</Text><TextInput style={styles.input} value={query} onChangeText={setQuery} placeholder="搜索书名、作者或分类" placeholderTextColor="#A4AAA3" accessibilityLabel="搜索书籍" /></View>
-      <Text style={styles.caption}>来自 {sources.length} 个书源 · {books.length} 本书</Text>
+      <Text style={styles.caption}>离线演示 · {books.length} 本书</Text>
+      <Text style={styles.caption}>网站规则书源可在「书源」中管理，在线搜索与正文解析尚未接入。</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {books.length ? books.map((book) => <BookCard key={`${book.sourceId}/${book.id}`} book={book} />) : <Text style={styles.empty}>没有找到相关书籍</Text>}
     </Page>

@@ -1,7 +1,7 @@
 import { StaticSourceDocument } from '../domain/books';
 import { createStaticAdapter } from './static';
 
-const demo: StaticSourceDocument = {
+export const builtinDocument: StaticSourceDocument = {
   version: 1,
   id: 'sample-library',
   name: '演示书库',
@@ -28,9 +28,4 @@ const demo: StaticSourceDocument = {
   ],
 };
 
-export const builtinSource = createStaticAdapter(demo, 'builtin');
-export const exampleJson = JSON.stringify({
-  version: 1, id: 'my-library', name: '我的 JSON 书源', description: '本地导入示例',
-  books: [{ id: 'hello', title: '第一本书', author: '我', summary: '从这里开始编写内容。', category: '原创', status: '连载中', accent: '#7A695B' }],
-  chapters: [{ id: '1', bookId: 'hello', title: '第一章', paragraphs: ['这是第一段。', '这是第二段。'] }],
-}, null, 2);
+export const builtinSource = createStaticAdapter(builtinDocument, 'builtin');

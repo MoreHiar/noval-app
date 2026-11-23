@@ -1,65 +1,173 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Page } from '../../components/Page';
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SourceButton, SourceMessage, sourceStyles as s } from '../../components/SourceControls';
+import { TabBarIcon } from '../../components/TabBarIcon';
 import { theme } from '../../components/theme';
-import { exampleJson } from '../../sources/builtin';
+import { RuleManagedSource } from '../../domain/books';
+import { exportSourceFile } from '../../sources/files';
+import { definitionId, isRuleSource, sourceTypeName } from '../../sources/legado';
+import { exportSources } from '../../sources/management';
 import { useLibrary } from '../../state/library';
 
-const kindName = { builtin: '内置', json: 'JSON', javascript: 'JavaScript' };
+const filters = [{ key: 'all', label: '全部' }, { key: 'enabled', label: '已启用' }, { key: 'disabled', label: '已停用' }] as const;
+type Filter = typeof filters[number]['key'];
 
 export default function SourcesScreen() {
-  const { sources, addJsonSource } = useLibrary();
-  const [input, setInput] = useState('');
+  const { sourceDefinitions: allDefinitions, ready, storageError, retryLoad, setSourceEnabled, removeSource, shelf } = useLibrary();
+  const sourceDefinitions = useMemo(() => allDefinitions.filter(isRuleSource), [allDefinitions]);
+  const enabledCount = sourceDefinitions.filter(entry => entry.enabled).length;
+  const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState<RuleManagedSource | null>(null);
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const visible = useMemo(() => sourceDefinitions.filter(entry => {
+    const matchesFilter = filter === 'all' || (filter === 'enabled' ? entry.enabled : !entry.enabled);
+    const term = query.trim().toLocaleLowerCase();
+    const { bookSourceName: name, bookSourceUrl: id, bookSourceComment: description, bookSourceGroup: group } = entry.document;
+    return matchesFilter && (!term || `${name} ${id} ${group ?? ''} ${description ?? ''}`.toLocaleLowerCase().includes(term));
+  }), [sourceDefinitions, filter, query]);
 
-  const add = () => {
-    try {
-      addJsonSource(input);
-      setInput('');
-      setMessage('书源已添加，可以在发现页搜索。');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : '导入失败');
-    }
+  const perform = async (action: () => Promise<void>) => {
+    setBusy(true); setError(''); setMessage('');
+    try { await action(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : '操作失败，请重试。'); }
+    finally { setBusy(false); }
   };
+  const exportItems = (entries: RuleManagedSource[], single = false) => perform(async () => {
+    await exportSourceFile(single ? `${entries[0].document.bookSourceName.replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]/g, '_').slice(0, 60) || 'source'}.json` : 'noval-sources.json', exportSources(entries, single));
+    setMessage('已发起书源导出，导出的 JSON 文件可再次导入。');
+  });
+  const deleteNow = () => perform(async () => {
+    if (!deleting) return;
+    await removeSource(definitionId(deleting));
+    setMessage(`已删除「${deleting.document.bookSourceName}」。`);
+    setDeleting(null);
+  });
+  const deletedShelfCount = deleting ? shelf.filter(key => key.startsWith(`${definitionId(deleting)}/`)).length : 0;
 
   return (
-    <Page title="书源管理" eyebrow="SOURCE LIBRARY">
-      <Text style={styles.sectionTitle}>已启用 · {sources.length}</Text>
-      {sources.map((source) => (
-        <View key={source.info.id} style={styles.source}>
-          <View style={styles.badge}><Text style={styles.badgeText}>{source.info.name.slice(0, 1)}</Text></View>
-          <View style={styles.sourceInfo}><Text style={styles.sourceName}>{source.info.name}</Text><Text style={styles.sourceDescription}>{source.info.description}</Text></View>
-          <Text style={styles.kind}>{kindName[source.info.kind]}</Text>
+    <View style={styles.page}>
+      <FlatList
+        data={ready ? visible : []}
+        keyExtractor={item => definitionId(item)}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 22 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View>
+            <Text style={styles.eyebrow}>YOUR READING SOURCES</Text>
+            <View style={styles.headingRow}><Text style={styles.heading}>书源管理</Text><View style={styles.totalBadge}><Text style={styles.totalText}>{sourceDefinitions.length} 个书源</Text></View></View>
+            <Text style={styles.subtitle}>管理网站、搜索和解析规则，兼容阅读书源格式。</Text>
+            <View style={styles.summary}>
+              <View style={styles.summaryIcon}><TabBarIcon name="sources" color={theme.dark} size={29} /></View>
+              <View style={styles.summaryCopy}><Text style={styles.summaryTitle}>{enabledCount} 个已启用</Text><Text style={styles.summaryHint}>启用状态与规则保存在本地，可随时导出。</Text></View>
+            </View>
+            <Text style={styles.runtimeHint}>在线搜索、正文解析及脚本运行尚未接入；当前支持规则配置管理。</Text>
+            <View style={styles.toolbar}>
+              <SourceButton onPress={() => { setMessage(''); setError(''); router.push('/source/edit'); }} disabled={!ready || busy}>＋ 新增书源</SourceButton>
+              <SourceButton secondary onPress={() => { setMessage(''); setError(''); router.push('/source/import'); }} disabled={!ready || busy}>导入</SourceButton>
+              <SourceButton secondary onPress={() => exportItems(sourceDefinitions)} disabled={!ready || busy || !sourceDefinitions.length}>全部导出</SourceButton>
+            </View>
+            <View style={styles.search}>
+              <TabBarIcon name="search" color={theme.muted} size={18} />
+              <TextInput style={styles.searchInput} value={query} onChangeText={setQuery} placeholder="搜索名称、网址或分组" placeholderTextColor={theme.muted} accessibilityLabel="搜索书源" autoCapitalize="none" autoCorrect={false} />
+            </View>
+            <View style={styles.filters}>
+              {filters.map(item => <Pressable key={item.key} onPress={() => setFilter(item.key)} accessibilityRole="button" accessibilityState={{ selected: filter === item.key }} style={[styles.filter, filter === item.key && styles.activeFilter]}><Text style={[styles.filterText, filter === item.key && styles.activeFilterText]}>{item.label}</Text></Pressable>)}
+              <Text style={styles.resultCount}>{visible.length} 个</Text>
+            </View>
+            {storageError ? <><SourceMessage error>{storageError}</SourceMessage><SourceButton secondary onPress={retryLoad}>重新加载</SourceButton></> : null}
+            {error ? <SourceMessage error>{error}</SourceMessage> : null}
+            {message ? <SourceMessage>{message}</SourceMessage> : null}
+          </View>
+        }
+        ListEmptyComponent={ready ? <View style={styles.empty}><Text style={styles.emptyTitle}>{sourceDefinitions.length ? '没有匹配的书源' : '添加第一个书源'}</Text><Text style={styles.emptyHint}>{sourceDefinitions.length ? '试试其他关键词或筛选条件。' : '通过网络地址或本地 JSON 文件导入书源。'}</Text></View> : !storageError ? <ActivityIndicator color={theme.accent} style={styles.loading} /> : undefined}
+        renderItem={({ item }) => (
+          <View style={[styles.source, !item.enabled && styles.disabledSource]}>
+            <View style={styles.sourceHeading}>
+              <View style={styles.sourceBadge}><TabBarIcon name="sources" color={item.enabled ? theme.accent : theme.muted} size={24} /></View>
+              <View style={styles.sourceInfo}><Text style={styles.sourceName}>{item.document.bookSourceName}</Text><Text style={styles.sourceId} selectable>{item.document.bookSourceUrl}</Text></View>
+              <Switch value={item.enabled} onValueChange={enabled => perform(() => setSourceEnabled(definitionId(item), enabled))} disabled={busy || !ready} accessibilityLabel={`启用${item.document.bookSourceName}`} thumbColor={theme.paper} trackColor={{ true: theme.accent }} />
+            </View>
+            {item.document.bookSourceComment ? <Text style={styles.description} numberOfLines={2}>{item.document.bookSourceComment}</Text> : null}
+            <View style={styles.metadata}><Text style={styles.kind}>{sourceTypeName(item.document)}书源</Text><Text style={styles.metaText}>{item.document.bookSourceGroup || '未分组'}</Text><Text style={styles.metaText}>{item.document.enabledExplore ? '含发现规则' : '无发现入口'}</Text><Text style={[styles.status, !item.enabled && styles.inactiveStatus]}>{item.enabled ? '已启用' : '已停用'}</Text></View>
+            <View style={styles.sourceActions}>
+              <Pressable style={styles.rowButton} onPress={() => { setMessage(''); setError(''); router.push({ pathname: '/source/edit', params: { id: definitionId(item) } }); }} disabled={busy} accessibilityRole="button" accessibilityLabel={`编辑${item.document.bookSourceName}`}><Text style={styles.rowButtonText}>编辑</Text></Pressable>
+              <View style={styles.actionDivider} />
+              <Pressable style={styles.rowButton} onPress={() => exportItems([item], true)} disabled={busy} accessibilityRole="button" accessibilityLabel={`导出${item.document.bookSourceName}`}><Text style={styles.rowButtonText}>导出</Text></Pressable>
+              <View style={styles.actionDivider} />
+              <Pressable style={styles.rowButton} onPress={() => { setError(''); setDeleting(item); }} disabled={busy} accessibilityRole="button" accessibilityLabel={`删除${item.document.bookSourceName}`}><Text style={styles.deleteText}>删除</Text></Pressable>
+            </View>
+          </View>
+        )}
+      />
+      <Modal visible={deleting !== null} transparent animationType="fade" onRequestClose={() => { if (!busy) setDeleting(null); }}>
+        <View style={[styles.backdrop, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.dialog} accessibilityViewIsModal>
+            <Text style={s.sectionTitle}>删除书源？</Text>
+            <Text style={styles.dialogText}>删除「{deleting?.document.bookSourceName}」后，该书源的书籍将不再可用{deletedShelfCount > 0 ? `，并从书架移除 ${deletedShelfCount} 本收藏` : ''}。如需保留，请先导出备份。</Text>
+            {error ? <SourceMessage error>{error}</SourceMessage> : null}
+            <View style={styles.dialogActions}><SourceButton secondary onPress={() => setDeleting(null)} disabled={busy}>取消</SourceButton><SourceButton danger onPress={deleteNow} disabled={busy}>{busy ? '删除中…' : '确认删除'}</SourceButton></View>
+          </View>
         </View>
-      ))}
-      <Text style={[styles.sectionTitle, styles.importTitle]}>导入 JSON 书源</Text>
-      <Text style={styles.helper}>第一阶段支持包含书籍与章节内容的静态 JSON。可先加载示例，修改后导入。</Text>
-      <TextInput style={styles.editor} value={input} onChangeText={setInput} multiline placeholder="粘贴书源 JSON" placeholderTextColor="#A4AAA3" textAlignVertical="top" autoCapitalize="none" accessibilityLabel="书源 JSON 内容" />
-      {message ? <Text style={styles.message}>{message}</Text> : null}
-      <View style={styles.actions}>
-        <Pressable onPress={() => { setInput(exampleJson); setMessage(''); }} style={styles.secondary}><Text style={styles.secondaryText}>加载示例</Text></Pressable>
-        <Pressable onPress={add} style={styles.primary}><Text style={styles.primaryText}>导入书源</Text></Pressable>
-      </View>
-    </Page>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionTitle: { color: theme.ink, fontSize: 18, fontWeight: '800', marginBottom: 14 },
-  source: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.paper, padding: 14, borderRadius: 15, marginBottom: 9, gap: 12 },
-  badge: { width: 42, height: 42, borderRadius: 12, backgroundColor: theme.accentSoft, justifyContent: 'center', alignItems: 'center' },
-  badgeText: { color: theme.accent, fontSize: 18, fontWeight: '700' },
-  sourceInfo: { flex: 1 },
-  sourceName: { color: theme.ink, fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  sourceDescription: { color: theme.muted, fontSize: 11, lineHeight: 16 },
-  kind: { color: theme.accent, fontSize: 11, fontWeight: '700' },
-  importTitle: { marginTop: 28 },
-  helper: { color: theme.muted, fontSize: 12, lineHeight: 19, marginBottom: 12 },
-  editor: { minHeight: 160, maxHeight: 280, backgroundColor: theme.paper, borderRadius: 14, padding: 14, color: theme.ink, fontSize: 12, lineHeight: 18, borderWidth: 1, borderColor: theme.line },
-  message: { color: theme.accent, fontSize: 12, marginTop: 10 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  primary: { backgroundColor: theme.accent, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 18 },
-  primaryText: { color: 'white', fontWeight: '700' },
-  secondary: { backgroundColor: theme.paper, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 18, borderWidth: 1, borderColor: theme.line },
-  secondaryText: { color: theme.ink, fontWeight: '700' },
+  page: { flex: 1, backgroundColor: theme.background },
+  content: { paddingHorizontal: 20, paddingBottom: 130, maxWidth: 760, width: '100%', alignSelf: 'center' },
+  eyebrow: { color: theme.accent, fontSize: 10, fontWeight: '700', letterSpacing: 2.5, marginBottom: 9 },
+  headingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  heading: { color: theme.ink, fontSize: 30, fontWeight: '800', letterSpacing: 1 },
+  totalBadge: { backgroundColor: '#EAE8E0', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
+  totalText: { color: '#666E62', fontSize: 11, fontWeight: '600' },
+  runtimeHint: { color: theme.muted, fontSize: 12, lineHeight: 19, marginBottom: 18 },
+  subtitle: { color: theme.muted, fontSize: 12, lineHeight: 20, marginTop: 9, marginBottom: 22 },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#EAEDE5', borderRadius: 18, padding: 18, marginBottom: 18 },
+  summaryIcon: { width: 45, height: 45, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFFA0', borderRadius: 14 },
+  summaryCopy: { flex: 1 },
+  summaryTitle: { color: theme.dark, fontSize: 18, fontWeight: '800', marginBottom: 5 },
+  summaryHint: { color: '#7A8376', fontSize: 11, lineHeight: 18 },
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 22 },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 48, backgroundColor: theme.paper, borderRadius: 13, borderWidth: 1, borderColor: theme.line, marginBottom: 16 },
+  searchInput: { flex: 1, minWidth: 0, height: '100%', color: theme.ink, fontSize: 13 },
+  filters: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 18 },
+  filter: { minHeight: 40, paddingHorizontal: 15, paddingVertical: 11, borderRadius: 20 },
+  activeFilter: { backgroundColor: theme.dark },
+  filterText: { color: theme.muted, fontSize: 12, fontWeight: '600' },
+  activeFilterText: { color: '#FFFFFF' },
+  resultCount: { marginLeft: 'auto', fontSize: 11, color: theme.muted },
+  source: { backgroundColor: theme.paper, borderRadius: 18, paddingHorizontal: 17, paddingTop: 17, marginBottom: 14, borderWidth: 1, borderColor: theme.line },
+  disabledSource: { backgroundColor: '#FBFAF7' },
+  sourceHeading: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sourceBadge: { width: 43, height: 43, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center', borderRadius: 13 },
+  sourceInfo: { flex: 1, minWidth: 0 },
+  sourceName: { color: theme.ink, fontSize: 16, lineHeight: 23, fontWeight: '700' },
+  sourceId: { color: theme.muted, fontSize: 10, marginTop: 3 },
+  description: { color: '#7F857D', fontSize: 12, lineHeight: 19, marginTop: 13 },
+  metadata: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginVertical: 15 },
+  kind: { color: theme.accent, fontSize: 10, backgroundColor: theme.accentSoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, overflow: 'hidden' },
+  metaText: { color: theme.muted, fontSize: 11 },
+  status: { marginLeft: 'auto', color: '#4B785A', fontSize: 10 },
+  inactiveStatus: { color: theme.muted },
+  sourceActions: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F0EEE8' },
+  rowButton: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center' },
+  rowButtonText: { color: '#586252', fontSize: 12, fontWeight: '600' },
+  deleteText: { color: '#B57365', fontSize: 12, fontWeight: '600' },
+  actionDivider: { width: 1, height: 12, backgroundColor: theme.line },
+  empty: { paddingVertical: 60, alignItems: 'center' },
+  emptyTitle: { color: theme.ink, fontSize: 18, fontWeight: '700', marginBottom: 10 },
+  emptyHint: { color: theme.muted, fontSize: 12, lineHeight: 20, textAlign: 'center' },
+  loading: { padding: 50 },
+  backdrop: { flex: 1, backgroundColor: '#202A2766', paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' },
+  dialog: { width: '100%', maxWidth: 420, backgroundColor: theme.background, borderRadius: 22, padding: 24 },
+  dialogText: { color: '#737C72', fontSize: 13, lineHeight: 23, marginBottom: 24 },
+  dialogActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
 });

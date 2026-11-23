@@ -1,10 +1,12 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Page } from '../../components/Page';
 import { theme } from '../../components/theme';
+import { isRuleSource } from '../../sources/legado';
 import { useLibrary } from '../../state/library';
 
 export default function ProfileScreen() {
-  const { shelf, sources } = useLibrary();
+  const { shelf, sourceDefinitions } = useLibrary();
+  const sources = sourceDefinitions.filter(isRuleSource).filter(entry => entry.enabled);
   return (
     <Page title="我的阅读" eyebrow="PERSONAL SPACE">
       <View style={styles.card}>

@@ -44,3 +44,38 @@ export type StaticSourceDocument = {
   books: Omit<Book, 'sourceId'>[];
   chapters: Chapter[];
 };
+
+// Offline fixtures belong to the demo reader, not to the Legado exchange format.
+export type StaticManagedSource = {
+  kind: SourceKind;
+  enabled: boolean;
+  document: StaticSourceDocument;
+};
+
+export type RuleSourceDocument = {
+  bookSourceName: string;
+  bookSourceUrl: string;
+  bookSourceType?: number;
+  bookSourceGroup?: string;
+  bookSourceComment?: string;
+  enabled?: boolean;
+  enabledCookieJar?: boolean;
+  enabledExplore?: boolean;
+  searchUrl?: string;
+  exploreUrl?: string;
+  ruleSearch?: Record<string, unknown>;
+  ruleBookInfo?: Record<string, unknown>;
+  ruleToc?: Record<string, unknown>;
+  ruleContent?: Record<string, unknown>;
+  ruleExplore?: Record<string, unknown>;
+  // Preserve scripts, headers, login settings and future Legado fields verbatim.
+  [key: string]: unknown;
+};
+
+export type RuleManagedSource = {
+  kind: 'legado';
+  enabled: boolean;
+  document: RuleSourceDocument;
+};
+
+export type ManagedSource = StaticManagedSource | RuleManagedSource;
