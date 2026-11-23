@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Book } from '../domain/books';
 import { theme } from './theme';
 
@@ -22,7 +22,7 @@ export function BookCarousel({ books, selectedIndex, onSelect }: {
       toValue: selectedIndex,
       friction: 8,
       tension: 75,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [progress, selectedIndex]);
 

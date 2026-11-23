@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 export type TabBarIconName = 'search' | 'profile' | 'sources' | 'bookshelf';
@@ -41,7 +42,8 @@ export function TabBarIcon({ name, color, focused = false, size = 24 }: TabBarIc
       strokeWidth={focused ? 2 : 1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
-      accessible={false}
+      accessible={Platform.OS === 'web' ? undefined : false}
+      aria-hidden={Platform.OS === 'web' ? true : undefined}
       focusable={false}
     >
       {paths[name].map((d) => <Path key={d} d={d} />)}

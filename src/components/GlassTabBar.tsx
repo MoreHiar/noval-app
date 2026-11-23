@@ -24,7 +24,7 @@ export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabB
   const itemWidth = (pillWidth - 20) / state.routes.length;
 
   useEffect(() => {
-    Animated.spring(lensPosition, { toValue: state.index, friction: 8, tension: 80, useNativeDriver: true }).start();
+    Animated.spring(lensPosition, { toValue: state.index, friction: 8, tension: 80, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [lensPosition, state.index]);
 
   return (
