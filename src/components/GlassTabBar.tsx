@@ -4,15 +4,16 @@ import { Tabs } from 'expo-router';
 import { ComponentProps, useEffect, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TabBarIcon, type TabBarIconName } from './TabBarIcon';
 import { theme } from './theme';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
-const tabs: Record<string, { label: string; icon: string }> = {
-  discover: { label: '发现', icon: '⌕' },
-  index: { label: '书架', icon: '▥' },
-  sources: { label: '书源', icon: '▦' },
-  profile: { label: '我的', icon: '◯' },
+const tabs: Record<string, { label: string; icon: TabBarIconName }> = {
+  discover: { label: '搜索', icon: 'search' },
+  index: { label: '书架', icon: 'bookshelf' },
+  sources: { label: '书源', icon: 'sources' },
+  profile: { label: '我的', icon: 'profile' },
 };
 
 export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabBarProps) {
@@ -42,8 +43,9 @@ export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabB
         <View style={styles.items}>
           {state.routes.map((route, index) => {
             const focused = state.index === index;
-            const config = tabs[route.name] ?? { label: route.name, icon: '•' };
+            const config = tabs[route.name];
             const options = descriptors[route.key].options;
+            if (!config) return null;
             return (
               <Pressable
                 key={route.key}
@@ -57,7 +59,9 @@ export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabB
                 }}
                 onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
               >
-                <Text style={[styles.icon, focused && styles.activeIcon]}>{config.icon}</Text>
+                <View style={styles.icon}>
+                  <TabBarIcon name={config.icon} color={focused ? theme.ink : '#6A6B65'} focused={focused} />
+                </View>
                 <Text style={[styles.label, focused && styles.activeLabel]}>{config.label}</Text>
               </Pressable>
             );
@@ -80,8 +84,7 @@ const styles = StyleSheet.create({
   activeLens: { position: 'absolute', top: 6, left: 7, height: 53, borderRadius: 27, borderWidth: 1, borderColor: '#FFFFFFDF', shadowColor: '#FFFFFF', shadowOpacity: 0.75, shadowRadius: 9, overflow: 'hidden' },
   lensGlass: { flex: 1, borderRadius: 27 },
   lensFill: { flex: 1, backgroundColor: '#FFFFFFA0', borderRadius: 27 },
-  icon: { color: '#6A6B65', fontSize: 20, lineHeight: 24, marginBottom: 1 },
-  activeIcon: { color: theme.ink },
+  icon: { width: 24, height: 24, marginBottom: 1 },
   label: { color: '#737671', fontSize: 10, fontWeight: '600' },
   activeLabel: { color: theme.ink, fontWeight: '800' },
 });
