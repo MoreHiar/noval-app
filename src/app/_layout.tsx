@@ -1,0 +1,15 @@
+import { Stack } from 'expo-router';
+import { LibraryProvider } from '../state/library';
+import { theme } from '../components/theme';
+
+export default function RootLayout() {
+  return (
+    <LibraryProvider>
+      <Stack screenOptions={{ headerStyle: { backgroundColor: theme.background }, headerTintColor: theme.ink, headerShadowVisible: false, contentStyle: { backgroundColor: theme.background } }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="book/[sourceId]/[bookId]" options={{ title: '书籍详情' }} />
+        <Stack.Screen name="reader/[sourceId]/[bookId]/[chapterId]" options={{ title: '阅读' }} />
+      </Stack>
+    </LibraryProvider>
+  );
+}

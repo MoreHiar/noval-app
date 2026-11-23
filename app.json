@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "noval-app",
+    "name": "Noval 阅读",
     "slug": "noval-app",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "novalapp",
     "userInterfaceStyle": "automatic",
@@ -21,7 +21,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "server",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [

@@ -4,8 +4,10 @@
   "main": "expo-router/entry",
   "dependencies": {
     "expo": "~58.0.26",
+    "expo-blur": "~58.0.6",
     "expo-constants": "~58.0.16",
     "expo-font": "~58.0.12",
+    "expo-glass-effect": "~58.0.5",
     "expo-linking": "~58.0.17",
     "expo-router": "~58.0.32",
     "expo-splash-screen": "~58.0.14",
@@ -23,13 +25,16 @@
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "lint": "expo lint"
   },
   "private": true
 }
