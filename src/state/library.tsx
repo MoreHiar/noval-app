@@ -3,7 +3,7 @@ import { createContext, PropsWithChildren, useCallback, useContext, useEffect, u
 import { Book, ManagedSource, SourceAdapter, RuleSourceDocument } from '../domain/books';
 import { builtinDocument } from '../sources/builtin';
 import { javascriptDocument, javascriptExampleSource } from '../sources/javascript';
-import { deleteDefinition, LibraryData, mergeSources, parseLibraryData, parseSourceImport, saveDefinition } from '../sources/management';
+import { deleteDefinition, deleteRuleSources, LibraryData, mergeSources, parseLibraryData, parseSourceImport, saveDefinition, setAllRuleSourcesEnabled } from '../sources/management';
 import { createStaticAdapter } from '../sources/static';
 import { createLegadoSearchAdapter } from '../sources/legado-search';
 import { definitionId, isRuleSource } from '../sources/legado';
@@ -20,7 +20,9 @@ type LibraryState = {
   saveSource(document: RuleSourceDocument, enabled: boolean, existingId?: string): Promise<void>;
   importSources(input: string, replace: boolean): Promise<ImportResult>;
   removeSource(id: string): Promise<void>;
+  removeSources(ids: string[]): Promise<void>;
   setSourceEnabled(id: string, enabled: boolean): Promise<void>;
+  setAllSourcesEnabled(enabled: boolean): Promise<void>;
   toggleShelf(book: Book): Promise<void>;
   isOnShelf(book: Book): boolean;
   getSource(id: string): SourceAdapter | undefined;
@@ -101,9 +103,11 @@ export function LibraryProvider({ children }: PropsWithChildren) {
       });
     },
     removeSource: id => update(current => ({ data: deleteDefinition(current, id), result: undefined })),
+    removeSources: ids => update(current => ({ data: deleteRuleSources(current, ids), result: undefined })),
     setSourceEnabled: (id, enabled) => update(current => ({
       data: { ...current, definitions: current.definitions.map(entry => definitionId(entry) === id ? (isRuleSource(entry) ? { ...entry, enabled, document: { ...entry.document, enabled } } : { ...entry, enabled }) : entry) }, result: undefined,
     })),
+    setAllSourcesEnabled: enabled => update(current => ({ data: setAllRuleSourcesEnabled(current, enabled), result: undefined })),
     toggleShelf: book => update(current => {
       if (!current.definitions.some(entry => definitionId(entry) === book.sourceId && (isRuleSource(entry) || entry.document.books.some(item => item.id === book.id)))) throw new Error('书籍所属书源已被删除或修改。');
       const key = bookKey(book);

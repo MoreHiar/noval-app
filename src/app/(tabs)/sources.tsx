@@ -15,7 +15,7 @@ const filters = [{ key: 'all', label: '全部' }, { key: 'enabled', label: '已�
 type Filter = typeof filters[number]['key'];
 
 export default function SourcesScreen() {
-  const { sourceDefinitions: allDefinitions, ready, storageError, retryLoad, setSourceEnabled, removeSource, shelf } = useLibrary();
+  const { sourceDefinitions: allDefinitions, ready, storageError, retryLoad, setSourceEnabled, setAllSourcesEnabled, removeSource, removeSources, shelf } = useLibrary();
   const sourceDefinitions = useMemo(() => allDefinitions.filter(isRuleSource), [allDefinitions]);
   const enabledCount = sourceDefinitions.filter(entry => entry.enabled).length;
   const insets = useSafeAreaInsets();
@@ -23,6 +23,9 @@ export default function SourcesScreen() {
   const [filter, setFilter] = useState<Filter>('all');
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<RuleManagedSource | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const visible = useMemo(() => sourceDefinitions.filter(entry => {
@@ -31,6 +34,12 @@ export default function SourcesScreen() {
     const { bookSourceName: name, bookSourceUrl: id, bookSourceComment: description, bookSourceGroup: group } = entry.document;
     return matchesFilter && (!term || `${name} ${id} ${group ?? ''} ${description ?? ''}`.toLocaleLowerCase().includes(term));
   }), [sourceDefinitions, filter, query]);
+  const selected = sourceDefinitions.filter(entry => selectedIds.includes(definitionId(entry)));
+  const selectedSet = new Set(selected.map(definitionId));
+  const allVisibleSelected = visible.length > 0 && visible.every(entry => selectedSet.has(definitionId(entry)));
+  const deletingIds = confirmBulkDelete ? selected.map(definitionId) : deleting ? [definitionId(deleting)] : [];
+  const deletingIdSet = new Set(deletingIds);
+  const deletedShelfCount = shelf.filter(key => deletingIdSet.has(key.split('/')[0])).length;
 
   const perform = async (action: () => Promise<void>) => {
     setBusy(true); setError(''); setMessage('');
@@ -43,12 +52,28 @@ export default function SourcesScreen() {
     setMessage('已发起书源导出，导出的 JSON 文件可再次导入。');
   });
   const deleteNow = () => perform(async () => {
-    if (!deleting) return;
-    await removeSource(definitionId(deleting));
-    setMessage(`已删除「${deleting.document.bookSourceName}」。`);
-    setDeleting(null);
+    if (confirmBulkDelete) {
+      if (!selected.length) { setConfirmBulkDelete(false); return; }
+      await removeSources(selected.map(definitionId));
+      setMessage(`已删除 ${selected.length} 个书源。`);
+      setSelectedIds([]);
+      setSelecting(false);
+      setConfirmBulkDelete(false);
+    } else if (deleting) {
+      await removeSource(definitionId(deleting));
+      setMessage(`已删除「${deleting.document.bookSourceName}」。`);
+      setDeleting(null);
+    }
   });
-  const deletedShelfCount = deleting ? shelf.filter(key => key.startsWith(`${definitionId(deleting)}/`)).length : 0;
+  const setAllEnabled = (enabled: boolean) => perform(async () => {
+    await setAllSourcesEnabled(enabled);
+    setMessage(`已${enabled ? '启用' : '禁用'}全部 ${sourceDefinitions.length} 个书源。`);
+  });
+  const toggleSelection = (id: string) => setSelectedIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  const toggleVisibleSelection = () => setSelectedIds(current => allVisibleSelected
+    ? current.filter(id => !visible.some(entry => definitionId(entry) === id))
+    : [...new Set([...current, ...visible.map(definitionId)])]);
+  const cancelSelection = () => { setSelecting(false); setSelectedIds([]); setConfirmBulkDelete(false); };
 
   return (
     <View style={styles.page}>
@@ -69,9 +94,14 @@ export default function SourcesScreen() {
             </View>
             <Text style={styles.runtimeHint}>已启用书源会参与搜索；暂支持简单 GET／POST 与 CSS／Legado 选择器，未支持的规则会在搜索页显示原因。在线目录、正文与脚本运行仍在接入中。</Text>
             <View style={styles.toolbar}>
-              <SourceButton onPress={() => { setMessage(''); setError(''); router.push('/source/edit'); }} disabled={!ready || busy}>＋ 新增书源</SourceButton>
-              <SourceButton secondary onPress={() => { setMessage(''); setError(''); router.push('/source/import'); }} disabled={!ready || busy}>导入</SourceButton>
-              <SourceButton secondary onPress={() => exportItems(sourceDefinitions)} disabled={!ready || busy || !sourceDefinitions.length}>全部导出</SourceButton>
+              <SourceButton onPress={() => { setMessage(''); setError(''); router.push('/source/edit'); }} disabled={!ready || busy || selecting}>＋ 新增书源</SourceButton>
+              <SourceButton secondary onPress={() => { setMessage(''); setError(''); router.push('/source/import'); }} disabled={!ready || busy || selecting}>导入</SourceButton>
+              <SourceButton secondary onPress={() => exportItems(sourceDefinitions)} disabled={!ready || busy || !sourceDefinitions.length || selecting}>全部导出</SourceButton>
+            </View>
+            <View style={styles.bulkToolbar}>
+              <SourceButton secondary onPress={() => setAllEnabled(true)} disabled={!ready || busy || selecting || enabledCount === sourceDefinitions.length}>全部启用</SourceButton>
+              <SourceButton secondary onPress={() => setAllEnabled(false)} disabled={!ready || busy || selecting || enabledCount === 0}>全部禁用</SourceButton>
+              <SourceButton danger onPress={() => { setError(''); setMessage(''); setSelecting(true); }} disabled={!ready || busy || selecting || !sourceDefinitions.length}>批量删除</SourceButton>
             </View>
             <View style={styles.search}>
               <TabBarIcon name="search" color={theme.muted} size={18} />
@@ -81,6 +111,12 @@ export default function SourcesScreen() {
               {filters.map(item => <Pressable key={item.key} onPress={() => setFilter(item.key)} accessibilityRole="button" accessibilityState={{ selected: filter === item.key }} style={[styles.filter, filter === item.key && styles.activeFilter]}><Text style={[styles.filterText, filter === item.key && styles.activeFilterText]}>{item.label}</Text></Pressable>)}
               <Text style={styles.resultCount}>{visible.length} 个</Text>
             </View>
+            {selecting && <View style={styles.selectionBar}>
+              <Text style={styles.selectionCount}>已选 {selected.length} 个</Text>
+              <SourceButton secondary onPress={toggleVisibleSelection} disabled={busy || !visible.length}>{allVisibleSelected ? '取消选中当前' : '选中当前可见'}</SourceButton>
+              <SourceButton secondary onPress={cancelSelection} disabled={busy}>取消</SourceButton>
+              <SourceButton danger onPress={() => setConfirmBulkDelete(true)} disabled={busy || !selected.length}>删除所选</SourceButton>
+            </View>}
             {storageError ? <><SourceMessage error>{storageError}</SourceMessage><SourceButton secondary onPress={retryLoad}>重新加载</SourceButton></> : null}
             {error ? <SourceMessage error>{error}</SourceMessage> : null}
             {message ? <SourceMessage>{message}</SourceMessage> : null}
@@ -90,32 +126,32 @@ export default function SourcesScreen() {
         renderItem={({ item }) => (
           <View style={[styles.source, !item.enabled && styles.disabledSource]}>
             <View style={styles.sourceHeading}>
-              <View style={styles.sourceBadge}><TabBarIcon name="sources" color={item.enabled ? theme.accent : theme.muted} size={24} /></View>
+              {selecting ? <Pressable onPress={() => toggleSelection(definitionId(item))} accessibilityRole="checkbox" accessibilityState={{ checked: selectedSet.has(definitionId(item)) }} accessibilityLabel={`选择${item.document.bookSourceName}`} style={[styles.checkbox, selectedSet.has(definitionId(item)) && styles.checkedBox]}><Text style={styles.checkmark}>{selectedSet.has(definitionId(item)) ? '✓' : ''}</Text></Pressable> : <View style={styles.sourceBadge}><TabBarIcon name="sources" color={item.enabled ? theme.accent : theme.muted} size={24} /></View>}
               <View style={styles.sourceInfo}><Text style={styles.sourceName}>{item.document.bookSourceName}</Text><Text style={styles.sourceId} selectable>{item.document.bookSourceUrl}</Text></View>
-              <Switch value={item.enabled} onValueChange={enabled => perform(() => setSourceEnabled(definitionId(item), enabled))} disabled={busy || !ready} accessibilityLabel={`启用${item.document.bookSourceName}`} thumbColor={theme.paper} trackColor={{ true: theme.accent }} />
+              {!selecting && <Switch value={item.enabled} onValueChange={enabled => perform(() => setSourceEnabled(definitionId(item), enabled))} disabled={busy || !ready} accessibilityLabel={`启用${item.document.bookSourceName}`} thumbColor={theme.paper} trackColor={{ true: theme.accent }} />}
             </View>
             {item.document.bookSourceComment ? <Text style={styles.description} numberOfLines={2}>{item.document.bookSourceComment}</Text> : null}
             <View style={styles.metadata}><Text style={styles.kind}>{sourceTypeName(item.document)}书源</Text><Text style={styles.metaText}>{item.document.bookSourceGroup || '未分组'}</Text><Text style={styles.metaText}>{item.document.enabledExplore ? '含发现规则' : '无发现入口'}</Text><Text style={[styles.status, !item.enabled && styles.inactiveStatus]}>{item.enabled ? '已启用' : '已停用'}</Text></View>
-            <View style={styles.sourceActions}>
+            {selecting ? <Pressable style={styles.selectRow} onPress={() => toggleSelection(definitionId(item))} accessibilityRole="checkbox" accessibilityState={{ checked: selectedSet.has(definitionId(item)) }} accessibilityLabel={`${selectedSet.has(definitionId(item)) ? '取消选择' : '选择'}${item.document.bookSourceName}`}><Text style={styles.rowButtonText}>{selectedSet.has(definitionId(item)) ? '已选择' : '选择此书源'}</Text></Pressable> : <View style={styles.sourceActions}>
               <Pressable style={styles.rowButton} onPress={() => { setMessage(''); setError(''); router.push({ pathname: '/source/edit', params: { id: definitionId(item) } }); }} disabled={busy} accessibilityRole="button" accessibilityLabel={`编辑${item.document.bookSourceName}`}><Text style={styles.rowButtonText}>编辑</Text></Pressable>
               <View style={styles.actionDivider} />
               <Pressable style={styles.rowButton} onPress={() => exportItems([item], true)} disabled={busy} accessibilityRole="button" accessibilityLabel={`导出${item.document.bookSourceName}`}><Text style={styles.rowButtonText}>导出</Text></Pressable>
               <View style={styles.actionDivider} />
               <Pressable style={styles.rowButton} onPress={() => { setError(''); setDeleting(item); }} disabled={busy} accessibilityRole="button" accessibilityLabel={`删除${item.document.bookSourceName}`}><Text style={styles.deleteText}>删除</Text></Pressable>
-            </View>
+            </View>}
           </View>
         )}
       />
-      <Modal visible={deleting !== null} transparent animationType="fade" onRequestClose={() => { if (!busy) setDeleting(null); }}>
+      {(deleting !== null || confirmBulkDelete) && <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) { setDeleting(null); setConfirmBulkDelete(false); } }}>
         <View style={[styles.backdrop, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
           <View style={styles.dialog} accessibilityViewIsModal>
-            <Text style={s.sectionTitle}>删除书源？</Text>
-            <Text style={styles.dialogText}>删除「{deleting?.document.bookSourceName}」后，该书源的书籍将不再可用{deletedShelfCount > 0 ? `，并从书架移除 ${deletedShelfCount} 本收藏` : ''}。如需保留，请先导出备份。</Text>
+            <Text style={s.sectionTitle}>{confirmBulkDelete ? `删除所选 ${selected.length} 个书源？` : '删除书源？'}</Text>
+            <Text style={styles.dialogText}>{confirmBulkDelete ? `删除所选 ${selected.length} 个书源后，这些书源的书籍将不再可用` : `删除「${deleting?.document.bookSourceName}」后，该书源的书籍将不再可用`}{deletedShelfCount > 0 ? `，并从书架移除 ${deletedShelfCount} 本收藏` : ''}。如需保留，请先导出备份。</Text>
             {error ? <SourceMessage error>{error}</SourceMessage> : null}
-            <View style={styles.dialogActions}><SourceButton secondary onPress={() => setDeleting(null)} disabled={busy}>取消</SourceButton><SourceButton danger onPress={deleteNow} disabled={busy}>{busy ? '删除中…' : '确认删除'}</SourceButton></View>
+            <View style={styles.dialogActions}><SourceButton secondary onPress={() => { setDeleting(null); setConfirmBulkDelete(false); }} disabled={busy}>取消</SourceButton><SourceButton danger onPress={deleteNow} disabled={busy || !deletingIds.length}>{busy ? '删除中…' : '确认删除'}</SourceButton></View>
           </View>
         </View>
-      </Modal>
+      </Modal>}
     </View>
   );
 }
@@ -136,6 +172,13 @@ const styles = StyleSheet.create({
   summaryTitle: { color: theme.dark, fontSize: 18, fontWeight: '800', marginBottom: 5 },
   summaryHint: { color: '#7A8376', fontSize: 11, lineHeight: 18 },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 22 },
+  bulkToolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 18 },
+  selectionBar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 18 },
+  selectionCount: { color: theme.ink, fontSize: 13, fontWeight: '700', minWidth: 64 },
+  checkbox: { width: 43, height: 43, borderRadius: 8, borderWidth: 2, borderColor: theme.line, alignItems: 'center', justifyContent: 'center' },
+  checkedBox: { backgroundColor: theme.accent, borderColor: theme.accent },
+  checkmark: { color: '#FFFFFF', fontSize: 24, fontWeight: '700' },
+  selectRow: { borderTopWidth: 1, borderTopColor: theme.line, minHeight: 46, justifyContent: 'center', alignItems: 'center' },
   search: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 48, backgroundColor: theme.paper, borderRadius: 13, borderWidth: 1, borderColor: theme.line, marginBottom: 16 },
   searchInput: { flex: 1, minWidth: 0, height: '100%', color: theme.ink, fontSize: 13 },
   filters: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 18 },

@@ -63,6 +63,21 @@ export function deleteDefinition(current: LibraryData, id: string): LibraryData 
   return { ...current, definitions, shelf: pruneShelf(current.shelf, definitions) };
 }
 
+export function setAllRuleSourcesEnabled(current: LibraryData, enabled: boolean): LibraryData {
+  return {
+    ...current,
+    definitions: current.definitions.map(entry => isRuleSource(entry)
+      ? { ...entry, enabled, document: { ...entry.document, enabled } }
+      : entry),
+  };
+}
+
+export function deleteRuleSources(current: LibraryData, ids: string[]): LibraryData {
+  const selected = new Set(ids);
+  const definitions = current.definitions.filter(entry => !isRuleSource(entry) || !selected.has(definitionId(entry)));
+  return { ...current, definitions, shelf: pruneShelf(current.shelf, definitions) };
+}
+
 export function parseLibraryData(input: string): LibraryData {
   const raw = readSourceJson(input);
   if (!isRecord(raw) || raw.version !== 1 || !Array.isArray(raw.definitions) || !Array.isArray(raw.shelf) || !raw.shelf.every(key => typeof key === 'string')) throw new Error('本地书源数据格式无效。');

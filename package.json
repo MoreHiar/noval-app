@@ -45,7 +45,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test:search": "node --test tests/search.cjs tests/source-relay.cjs"
+    "test:search": "node --test tests/search.cjs tests/source-relay.cjs",
+    "test:sources": "node --test tests/management.cjs"
   },
   "private": true
 }
