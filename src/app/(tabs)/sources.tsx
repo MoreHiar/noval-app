@@ -67,7 +67,7 @@ export default function SourcesScreen() {
               <View style={styles.summaryIcon}><TabBarIcon name="sources" color={theme.dark} size={29} /></View>
               <View style={styles.summaryCopy}><Text style={styles.summaryTitle}>{enabledCount} 个已启用</Text><Text style={styles.summaryHint}>启用状态与规则保存在本地，可随时导出。</Text></View>
             </View>
-            <Text style={styles.runtimeHint}>在线搜索、正文解析及脚本运行尚未接入；当前支持规则配置管理。</Text>
+            <Text style={styles.runtimeHint}>已启用书源会参与搜索；暂支持简单 GET／POST 与 CSS／Legado 选择器，未支持的规则会在搜索页显示原因。在线目录、正文与脚本运行仍在接入中。</Text>
             <View style={styles.toolbar}>
               <SourceButton onPress={() => { setMessage(''); setError(''); router.push('/source/edit'); }} disabled={!ready || busy}>＋ 新增书源</SourceButton>
               <SourceButton secondary onPress={() => { setMessage(''); setError(''); router.push('/source/import'); }} disabled={!ready || busy}>导入</SourceButton>

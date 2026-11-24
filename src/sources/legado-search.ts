@@ -1,0 +1,175 @@
+import JSON5 from 'json5';
+import type { Book, RuleSourceDocument, SourceAdapter } from '../domain/books';
+import { ruleSourceId } from './legado';
+import { compileFieldRule, compileListRule, UnsupportedSearchRule } from './legado-rules';
+import { fetchSearchResponse } from './search-transport';
+import { isLegacySuduguSearch, knownSearchCover, searchRulesFor } from './search-compat';
+
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
+const TIMEOUT_MS = 20000;
+type RequestOptions = { method?: string; body?: string; charset?: string; headers?: unknown };
+const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+function httpUrl(value: string, base: string): string {
+  if (!value.trim()) throw new Error('搜索结果缺少书籍链接。');
+  const url = new URL(value, base);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('搜索链接必须为不含账号密码的 HTTP(S) 地址。');
+  return url.toString();
+}
+
+function headersFrom(value: unknown): Record<string, string> {
+  if (value === undefined || value === null || value === '') return {};
+  if (typeof value === 'string') {
+    try { value = JSON5.parse(value); }
+    catch { throw new UnsupportedSearchRule('请求头不是有效的 JSON 配置，暂不支持脚本请求头。'); }
+  }
+  if (!record(value)) throw new UnsupportedSearchRule('请求头必须是 JSON 对象。');
+  const headers: Record<string, string> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item !== 'string' || /@js:|<js>|\{\{/i.test(item)) throw new UnsupportedSearchRule('暂不支持动态请求头。');
+    // This first search implementation is stateless. Never supply saved cookies.
+    if (!/^(cookie|cookie2|host|connection|content-length)$/i.test(key)) headers[key] = item;
+  }
+  return headers;
+}
+
+export function buildSearchRequest(document: RuleSourceDocument, keyword: string) {
+  const endpoint = document.searchUrl?.trim();
+  if (!endpoint) throw new UnsupportedSearchRule('此书源没有搜索地址。');
+  if (/@js:|<js>/i.test(endpoint)) throw new UnsupportedSearchRule('此书源的搜索地址需要脚本支持。');
+  const boundary = endpoint.search(/,\s*\{/);
+  let options: RequestOptions = {};
+  if (boundary >= 0) {
+    let raw: unknown;
+    try { raw = JSON5.parse(endpoint.slice(boundary + 1)); }
+    catch { throw new UnsupportedSearchRule('搜索请求参数格式暂不支持。'); }
+    if (!record(raw)) throw new UnsupportedSearchRule('搜索请求参数必须是对象。');
+    if (Object.keys(raw).some(key => !['method', 'body', 'charset', 'headers'].includes(key))) throw new UnsupportedSearchRule('此书源含尚未支持的搜索请求选项。');
+    options = raw as RequestOptions;
+  }
+  if (options.charset && !/^utf-?8$/i.test(options.charset)) throw new UnsupportedSearchRule('此书源使用 ' + options.charset + ' 编码，尚未接入。');
+  const interpolate = (template: string) => {
+    const value = template.replace(/\{\{\s*key\s*\}\}/g, encodeURIComponent(keyword)).replace(/\{\{\s*page\s*\}\}/g, '1').replace(/\{\{\s*baseUrl\s*\}\}/g, document.bookSourceUrl.trim());
+    if (/\{\{|@js:|<js>/i.test(value)) throw new UnsupportedSearchRule('此书源的搜索模板需要脚本支持。');
+    return value;
+  };
+  if (options.method !== undefined && typeof options.method !== 'string') throw new UnsupportedSearchRule('搜索请求方法格式无效。');
+  const method = (options.method ?? 'GET').toUpperCase();
+  if (!['GET', 'POST'].includes(method)) throw new UnsupportedSearchRule('暂不支持此搜索请求方法：' + method);
+  if (options.body !== undefined && (typeof options.body !== 'string' || method !== 'POST')) throw new UnsupportedSearchRule('暂仅支持 POST 文字请求体。');
+  const headers = { ...headersFrom(document.header), ...headersFrom(options.headers) };
+  if (options.body !== undefined && !Object.keys(headers).some(key => key.toLowerCase() === 'content-type')) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+  const url = new URL(httpUrl(interpolate(boundary < 0 ? endpoint : endpoint.slice(0, boundary)), document.bookSourceUrl.trim()));
+  // This legacy source advertises HTTP, but its identical HTTPS endpoint is available.
+  // Use HTTPS for this verified endpoint so native transport security doesn't reject it.
+  if (url.hostname === 'appi.kuwo.cn' && url.protocol === 'http:') url.protocol = 'https:';
+  // Avoid the old host's POST → GET redirect, which discards the search keyword.
+  if (isLegacySuduguSearch(url)) { url.hostname = 'www.sudugu.cc'; url.protocol = 'https:'; }
+  return {
+    url: url.toString(),
+    init: { method, headers, credentials: 'omit' as const, ...(options.body !== undefined ? { body: interpolate(options.body) } : {}) },
+  };
+}
+
+function compileSearch(document: RuleSourceDocument) {
+  if (document.bookSourceType !== undefined && document.bookSourceType !== 0) throw new UnsupportedSearchRule('搜索暂仅支持文本书源。');
+  buildSearchRequest(document, 'test');
+  const rules = searchRulesFor(document);
+  const list = compileListRule(rules.bookList);
+  if (typeof rules.name !== 'string' || !rules.name.trim() || typeof rules.bookUrl !== 'string' || !rules.bookUrl.trim()) throw new UnsupportedSearchRule('缺少书名或书籍链接搜索规则。');
+  const name = compileFieldRule(rules.name);
+  const bookUrl = compileFieldRule(rules.bookUrl);
+  const optional = (expression: unknown) => {
+    try { return compileFieldRule(expression); }
+    catch { return () => ''; }
+  };
+  return { list, name, bookUrl, coverUrl: optional(rules.coverUrl), author: optional(rules.author), intro: optional(rules.intro), kind: optional(rules.kind) };
+}
+
+function aborted(): Error {
+  const error = new Error('已取消搜索。');
+  error.name = 'AbortError';
+  return error;
+}
+
+export function createLegadoSearchAdapter(document: RuleSourceDocument): SourceAdapter {
+  const sourceId = ruleSourceId(document);
+  const cache = new Map<string, Book>();
+  let compiled: ReturnType<typeof compileSearch> | undefined;
+  let searchUnavailableReason: string | undefined;
+  try { compiled = compileSearch(document); }
+  catch (cause) { searchUnavailableReason = cause instanceof Error ? cause.message : '暂不支持此搜索规则。'; }
+  return {
+    info: { id: sourceId, name: document.bookSourceName, kind: 'legado', description: document.bookSourceComment ?? '' },
+    searchUnavailableReason,
+    async search(query, signal) {
+      if (signal?.aborted) throw aborted();
+      if (!query.trim()) return [];
+      if (!compiled) throw new UnsupportedSearchRule(searchUnavailableReason);
+      const request = buildSearchRequest(document, query.trim());
+      const controller = new AbortController();
+      const cancel = () => controller.abort();
+      signal?.addEventListener('abort', cancel);
+      let timedOut = false;
+      const timer = setTimeout(() => { timedOut = true; cancel(); }, TIMEOUT_MS);
+      try {
+        const response = await fetchSearchResponse(request, controller.signal);
+        if (!response.ok) throw new Error('网站返回 HTTP ' + response.status);
+        if (Number(response.headers.get('content-length')) > MAX_RESPONSE_SIZE) throw new Error('搜索响应超过 5 MB。');
+        const contentType = response.headers.get('content-type') ?? '';
+        const charset = contentType.match(/charset\s*=\s*["']?([^;\s"']+)/i)?.[1];
+        if (charset && !/^utf-?8$/i.test(charset)) throw new Error('网站返回 ' + charset + ' 编码，尚未支持。');
+        const html = await response.text();
+        if (html.length > MAX_RESPONSE_SIZE) throw new Error('搜索响应超过 5 MB。');
+        if (signal?.aborted) throw aborted();
+        const items = compiled.list(html);
+        if (!items.length && /"(?:challenge_url|error)"\s*:\s*"(?:[^"\n]*challenge[^"\n]*|\/__gatekeeper[^"\n]*)"|<title>\s*(?:Just a moment|Attention Required)/i.test(html)) throw new Error('网站要求防护验证，当前直接搜索无法通过。');
+        const results = new Map<string, Book>();
+        for (const item of items.slice(0, 100)) {
+          const title = compiled.name(item);
+          const link = compiled.bookUrl(item);
+          if (!title || !link) continue;
+          let url: string;
+          try { url = httpUrl(link, response.url || request.url); }
+          catch { continue; }
+          let coverUrl: string | undefined;
+          const cover = compiled.coverUrl(item);
+          if (cover) {
+            try { coverUrl = httpUrl(cover, response.url || request.url); }
+            catch { /* Invalid optional artwork must not discard a book. */ }
+          }
+          coverUrl ??= knownSearchCover(document, url);
+          // Hex URLs contain no slash or percent escape, so Router can safely round-trip IDs.
+          const id = 'web-' + Array.from(url).map(char => char.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+          const book: Book = {
+            id, sourceId, title, author: compiled.author(item) || '未知作者',
+            summary: compiled.intro(item), category: compiled.kind(item) || '网络书源',
+            status: '状态未知', accent: '#526C63',
+            ...(coverUrl ? { coverUrl } : {}),
+          };
+          results.set(id, book);
+          cache.delete(id);
+          cache.set(id, book);
+        }
+        if (items.length && !results.size) throw new Error('找到了列表，但无法提取有效书名或链接，请检查书源规则是否已失效。');
+        while (cache.size > 500) cache.delete(cache.keys().next().value!);
+        return [...results.values()];
+      } catch (cause) {
+        if (signal?.aborted) throw aborted();
+        if (timedOut) throw new Error('搜索超时，请稍后重试。');
+        const message = cause instanceof Error ? cause.message : '';
+        if (/hostname.*(?:not be found|could not)|ENOTFOUND|name.*not.*resolved/i.test(message)) throw new Error('书源域名无法解析，地址可能已失效。');
+        if (/certificate|SSL|TLS/i.test(message)) throw new Error('无法验证书源网站的 HTTPS 证书，请稍后重试或更换书源。');
+        if (/network connection was lost|ECONNRESET/i.test(message)) throw new Error('书源网站中断了连接，请稍后重试。');
+        if (cause instanceof TypeError) throw new Error('无法连接书源网站，请检查网络或稍后重试。');
+        throw cause;
+      } finally {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
+      }
+    },
+    async getBook(bookId) { return cache.get(bookId) ?? null; },
+    async getChapters() { return []; },
+    async getChapter() { return null; },
+  };
+}

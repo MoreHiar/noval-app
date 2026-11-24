@@ -15,7 +15,8 @@ src/app                 Expo Router 页面与导航
 src/components          通用界面与视觉常量
 src/state               书源及书架状态与本地持久化
 src/domain/books.ts     书、章节及 SourceAdapter 契约
-src/sources             内置、JSON 和可信 JS 适配器
+src/sources             内置、JSON、可信 JS 和 Legado 搜索适配器
+src/server              Web 书源转发服务实现
 ```
 
 可执行书源遵循相同的 `SourceAdapter`：`search`、`getBook`、`getChapters`、`getChapter`。书籍身份是 `(sourceId, bookId)`，避免不同书源的本地 ID 冲突。发现页对各源并发搜索，并保留成功源的结果；单一源报错不会让整个搜索失败。
@@ -28,9 +29,11 @@ src/sources             内置、JSON 和可信 JS 适配器
 
 离线示例使用单独的静态适配器，可信 JS 示例随应用打包。它们只用于体验现有书架和阅读链路，不出现在网站规则书源管理中，也不混入规则书源导出。旧原型的静态数据仍可从本地存储恢复。
 
-**当前边界：** 已实现规则配置管理，尚未实现在线解析引擎。网站规则不会伪装成可用适配器，也不会参与演示搜索。导入成功不代表网站可搜索、可阅读或可通过人机验证。
+**当前边界：** 已实现规则配置管理和在线搜索适配器。已启用书源参与搜索；支持简单 GET／POST、CSS／Legado 选择器、基础 JSONPath 和正则替换。脚本、XPath、复杂 JSONPath、非 UTF-8 编码等必填规则在请求前报告未支持原因。搜索结果的详情页仅展示搜索信息；在线详情、目录、正文及收藏尚未接入。导入成功不代表网站一定可访问或能通过防护验证。
 
-**脚本边界：** 不在应用主 JavaScript 环境中对用户提供的代码使用 `eval`、`Function` 或动态导入。规则中的 JavaScript 作为字符串保存及导出。后续需实现隔离执行宿主和 `java` 兼容接口、编码、Cookie、登录及浏览器验证；同时实现 CSS／Legado 选择器、XPath、JSONPath、模板、正则与分页。各平台验证完成后再将在线适配器接入搜索和阅读。
+**脚本边界：** 不在应用主 JavaScript 环境中对用户提供的代码使用 `eval`、`Function` 或动态导入。规则中的 JavaScript 作为字符串保存及导出。后续按需要实现隔离执行宿主和 `java` 兼容接口、其他编码、XPath、复杂 JSONPath、复杂模板与分页。
+
+搜索实现分为 `legado-rules.ts`（HTML／JSON 和声明式规则）、`legado-search.ts`（请求配置、超时、取消和结果缓存）以及 `search.ts`（最多三源并发、增量发布及错误隔离）。HTML 使用 htmlparser2 和 css-select 解析；POST 配置使用 JSON5 数据解析。`search-transport.ts` 在原生端直接请求，`.web.ts` 调用同源 API；`src/app/api/source-fetch+api.ts` 导出 `src/server/source-fetch.ts` 的 Node 转发处理器。转发限制域名、端口、公网地址及响应大小，逐次验证重定向，并将 DNS 地址固定到连接。搜索页负责防抖和 FlatList 渲染，不直接解析或请求网站；离线示例不计入在线书源响应数。
 
 ## 数据与阅读链路
 
@@ -50,7 +53,7 @@ src/sources             内置、JSON 和可信 JS 适配器
 | iOS | Expo Router + React Native | `expo-sqlite` | Expo 开发构建、EAS Build/Submit/Update |
 | macOS | React Native Web + Tauri 桌面外壳 | IndexedDB 或桌面 SQLite 适配器 | Tauri 受控请求代理、macOS 签名与公证 |
 
-Web 直接访问第三方站点可能受到 CORS 限制，桌面版通过外壳的受控请求代理保持与移动端相同的书源契约。Expo Web 的 `single` 输出可作为桌面外壳的前端资源；桌面打包、签名与公证在交付阶段完成。
+当前 Web 使用 Expo 的 `server` 输出，通过同源 API 转发搜索请求，生产环境需要部署服务端。新增允许域名使用服务端环境变量 `NOVAL_SOURCE_HOSTS`；网站自身的 403／503 或失效域名仍会导致失败。桌面版计划通过外壳的受控请求代理保持相同的书源契约；未来打包 Tauri 时需单独配置静态前端输出与外壳网络适配，不能直接沿用当前服务端部署方式。桌面打包、签名与公证在交付阶段完成。
 
 ## 阶段计划
 
@@ -69,7 +72,7 @@ npx expo lint
 npx tsc --noEmit
 ```
 
-打开应用后，书架中的《星河邮差》可进入目录和阅读页；搜索页体验离线搜索；书源页可通过 XIU2 JSON 地址或本地文件导入真实规则，验证字段保留、重复跳过／覆盖、编辑、启停、删除、导出及重启恢复。在线抓取不在当前验收范围。文件导入、导出和持久化使用 SDK 58 支持的模块，可在 Expo Go 运行；已有自定义开发构建需要重新构建以包含新增原生模块。
+打开应用后，书架中的《星河邮差》可进入目录和阅读页；书源页可通过 XIU2 JSON 地址或本地文件导入规则。输入关键词后，搜索页会使用已启用书源，逐源显示结果和失败原因。搜索规则回归测试运行 `npm run test:search`；合成 HTML 测试与三平台资源打包不替代真实网站和原生设备验证。文件导入、导出和持久化使用 SDK 58 支持的模块；此次搜索依赖均为纯 JavaScript，不增加原生模块。
 
 ## 参考资料
 

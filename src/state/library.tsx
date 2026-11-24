@@ -5,6 +5,7 @@ import { builtinDocument } from '../sources/builtin';
 import { javascriptDocument, javascriptExampleSource } from '../sources/javascript';
 import { deleteDefinition, LibraryData, mergeSources, parseLibraryData, parseSourceImport, saveDefinition } from '../sources/management';
 import { createStaticAdapter } from '../sources/static';
+import { createLegadoSearchAdapter } from '../sources/legado-search';
 import { definitionId, isRuleSource } from '../sources/legado';
 
 type ImportResult = { added: number; updated: number; skipped: number };
@@ -78,7 +79,9 @@ export function LibraryProvider({ children }: PropsWithChildren) {
     return operation;
   }, []);
 
-  const sources = useMemo(() => data.definitions.filter(entry => !isRuleSource(entry)).map(({ document, kind }) => {
+  const sources = useMemo(() => data.definitions.map(entry => {
+    if (isRuleSource(entry)) return createLegadoSearchAdapter(entry.document);
+    const { document, kind } = entry;
     if (kind === 'javascript' && document.id === javascriptDocument.id) {
       return { ...javascriptExampleSource, info: { ...javascriptExampleSource.info, name: document.name, description: document.description ?? '' } };
     }

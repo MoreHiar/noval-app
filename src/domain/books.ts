@@ -1,4 +1,4 @@
-export type SourceKind = 'builtin' | 'json' | 'javascript';
+export type SourceKind = 'builtin' | 'json' | 'javascript' | 'legado';
 
 export type SourceInfo = {
   id: string;
@@ -14,8 +14,9 @@ export type Book = {
   author: string;
   summary: string;
   category: string;
-  status: '连载中' | '已完结';
+  status: '连载中' | '已完结' | '状态未知';
   accent: string;
+  coverUrl?: string;
 };
 
 export type ChapterMeta = {
@@ -30,7 +31,8 @@ export type Chapter = ChapterMeta & {
 
 export type SourceAdapter = {
   info: SourceInfo;
-  search(query: string): Promise<Book[]>;
+  searchUnavailableReason?: string;
+  search(query: string, signal?: AbortSignal): Promise<Book[]>;
   getBook(bookId: string): Promise<Book | null>;
   getChapters(bookId: string): Promise<ChapterMeta[]>;
   getChapter(bookId: string, chapterId: string): Promise<Chapter | null>;
@@ -47,7 +49,7 @@ export type StaticSourceDocument = {
 
 // Offline fixtures belong to the demo reader, not to the Legado exchange format.
 export type StaticManagedSource = {
-  kind: SourceKind;
+  kind: Exclude<SourceKind, 'legado'>;
   enabled: boolean;
   document: StaticSourceDocument;
 };

@@ -2,6 +2,7 @@ import { Link, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../../../components/theme';
+import { BookCover } from '../../../components/BookCover';
 import { Book, ChapterMeta } from '../../../domain/books';
 import { useLibrary } from '../../../state/library';
 
@@ -27,19 +28,19 @@ export default function BookScreen() {
 
   if (!source) return <View style={styles.center}><Text>未找到书源。请返回书源页重新导入。</Text></View>;
   if (loadError) return <View style={styles.center}><Text>{loadError}</Text></View>;
-  if (!book) return <View style={styles.center}><Text>{resolved ? '书籍已不存在，可能已被书源修改或移除。' : '正在加载书籍…'}</Text></View>;
+  if (!book) return <View style={styles.center}><Text>{resolved ? source.info.kind === 'legado' ? '搜索信息已过期，请返回搜索页重新搜索。' : '书籍已不存在，可能已被书源修改或移除。' : '正在加载书籍…'}</Text></View>;
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
       <View style={styles.head}>
-        <View style={[styles.cover, { backgroundColor: book.accent }]}><Text style={styles.coverTitle}>{book.title}</Text><Text style={styles.coverAuthor}>{book.author}</Text></View>
+        <BookCover book={book} large />
         <View style={styles.meta}><Text style={styles.title}>{book.title}</Text><Text style={styles.author}>{book.author}</Text><Text style={styles.metaLine}>{book.category} · {book.status}</Text><Text style={styles.source}>来源：{source.info.name}</Text></View>
       </View>
       <Text style={styles.sectionTitle}>内容简介</Text>
       <Text style={styles.summary}>{book.summary}</Text>
       <View style={styles.actions}>
         {chapters[0] && <Link href={{ pathname: '/reader/[sourceId]/[bookId]/[chapterId]', params: { sourceId, bookId, chapterId: chapters[0].id } }} asChild><Pressable style={styles.readButton}><Text style={styles.readText}>开始阅读</Text></Pressable></Link>}
-        <Pressable style={styles.shelfButton} onPress={() => { setShelfError(''); toggleShelf(book).catch(error => setShelfError(error.message)); }}><Text style={styles.shelfText}>{isOnShelf(book) ? '✓ 已在书架' : '+ 加入书架'}</Text></Pressable>
+        {source.info.kind !== 'legado' && <Pressable style={styles.shelfButton} onPress={() => { setShelfError(''); toggleShelf(book).catch(error => setShelfError(error.message)); }}><Text style={styles.shelfText}>{isOnShelf(book) ? '✓ 已在书架' : '+ 加入书架'}</Text></Pressable>}
       </View>
       {shelfError ? <Text accessibilityRole="alert" style={styles.summary}>{shelfError}</Text> : null}
       <View style={styles.chapterHeading}><Text style={styles.sectionTitle}>目录</Text><Text style={styles.count}>共 {chapters.length} 章</Text></View>
@@ -48,7 +49,7 @@ export default function BookScreen() {
           <Pressable style={styles.chapter}><Text style={styles.chapterTitle}>{chapter.title}</Text><Text style={styles.chevron}>›</Text></Pressable>
         </Link>
       ))}
-      {!chapters.length && <Text style={styles.summary}>暂无章节</Text>}
+      {!chapters.length && <Text style={styles.summary}>{source.info.kind === 'legado' ? '当前显示搜索结果信息。此书源的在线目录与正文尚未接入。' : '暂无章节'}</Text>}
     </ScrollView>
   );
 }
@@ -58,9 +59,6 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 50, maxWidth: 760, width: '100%', alignSelf: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   head: { flexDirection: 'row', gap: 22, marginTop: 12, marginBottom: 30 },
-  cover: { width: 120, height: 165, padding: 15, borderRadius: 10, justifyContent: 'space-between' },
-  coverTitle: { color: 'white', fontWeight: '800', fontSize: 22, lineHeight: 30 },
-  coverAuthor: { color: '#FFFFFFCC', fontSize: 12 },
   meta: { flex: 1, justifyContent: 'center' },
   title: { color: theme.ink, fontSize: 24, fontWeight: '800', marginBottom: 9 },
   author: { color: theme.muted, fontSize: 15, marginBottom: 15 },
