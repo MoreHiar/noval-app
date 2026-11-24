@@ -23,16 +23,18 @@ export function parseRuleSource(raw: unknown): RuleSourceDocument {
   for (const key of ['enabled', 'enabledExplore', 'enabledCookieJar']) {
     if (item[key] !== undefined && typeof item[key] !== 'boolean') throw new Error(`${key} 必须为 true 或 false。`);
   }
-  if (item.bookSourceType !== undefined && (!Number.isInteger(item.bookSourceType) || ![0, 1, 2, 3].includes(item.bookSourceType as number))) {
-    throw new Error('bookSourceType 应为 0（文本）、1（音频）、2（图片）或 3（文件）。');
+  if (item.bookSourceType !== undefined && (!Number.isInteger(item.bookSourceType) || ![0, 1, 2, 3, 4].includes(item.bookSourceType as number))) {
+    throw new Error('bookSourceType 应为 0（文本）、1（音频）、2（图片）、3（文件）或 4（视频）。');
   }
   for (const key of ['ruleSearch', 'ruleBookInfo', 'ruleToc', 'ruleContent', 'ruleExplore']) {
+    // Some Legado exports use an empty list for an absent discovery rule.
+    if (key === 'ruleExplore' && Array.isArray(item[key]) && item[key].length === 0) continue;
     if (item[key] !== undefined && (typeof item[key] !== 'object' || item[key] === null || Array.isArray(item[key]))) throw new Error(`${key} 必须是规则对象。`);
   }
   return item as RuleSourceDocument;
 }
 
-export const sourceTypeName = (document: RuleSourceDocument) => ['文本', '音频', '图片', '文件'][document.bookSourceType ?? 0];
+export const sourceTypeName = (document: RuleSourceDocument) => ['文本', '音频', '图片', '文件', '视频'][document.bookSourceType ?? 0];
 
 // Template used when creating a custom source.
 export const ruleSourceExample: RuleSourceDocument = {

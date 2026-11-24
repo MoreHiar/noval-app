@@ -24,19 +24,31 @@ export type ChapterMeta = {
   id: string;
   bookId: string;
   title: string;
+  locked?: boolean;
+  volume?: string;
 };
 
 export type Chapter = ChapterMeta & {
   paragraphs: string[];
+  fontUrl?: string;
+};
+
+export type ReadingProgress = {
+  sourceId: string;
+  bookId: string;
+  chapterId: string;
+  chapterTitle: string;
+  offset: number;
+  updatedAt: number;
 };
 
 export type SourceAdapter = {
   info: SourceInfo;
   searchUnavailableReason?: string;
   search(query: string, signal?: AbortSignal): Promise<Book[]>;
-  getBook(bookId: string): Promise<Book | null>;
-  getChapters(bookId: string): Promise<ChapterMeta[]>;
-  getChapter(bookId: string, chapterId: string): Promise<Chapter | null>;
+  getBook(bookId: string, signal?: AbortSignal): Promise<Book | null>;
+  getChapters(bookId: string, signal?: AbortSignal): Promise<ChapterMeta[]>;
+  getChapter(bookId: string, chapterId: string, signal?: AbortSignal): Promise<Chapter | null>;
 };
 
 export type StaticSourceDocument = {
@@ -70,7 +82,7 @@ export type RuleSourceDocument = {
   ruleBookInfo?: Record<string, unknown>;
   ruleToc?: Record<string, unknown>;
   ruleContent?: Record<string, unknown>;
-  ruleExplore?: Record<string, unknown>;
+  ruleExplore?: Record<string, unknown> | [];
   // Preserve scripts, headers, login settings and future Legado fields verbatim.
   [key: string]: unknown;
 };

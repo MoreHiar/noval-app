@@ -4,7 +4,7 @@ import { parseDocument } from 'htmlparser2';
 
 type RuleNode = ReturnType<typeof parseDocument>['children'][number];
 type SearchNode = { format: 'html'; value: RuleNode } | { format: 'json'; value: unknown };
-type Stage = { selector: string; index?: number; exclude?: number };
+type Stage = { selector: string; index?: number; exclude?: number; slice?: [number, number] };
 
 export class UnsupportedSearchRule extends Error {}
 
@@ -15,6 +15,8 @@ function stages(rule: string): Stage[] {
   const parts = rule.match(/(?:\[[^\]]*\]|[^@])+/g) ?? [];
   return parts.map(raw => {
     let selector = raw.trim();
+    const range = selector.match(/\[(-?\d+):(-?\d+)\]$/);
+    if (range) selector = selector.slice(0, range.index);
     const exclude = selector.match(/!(\d+)$/);
     if (exclude) selector = selector.slice(0, exclude.index);
     const index = selector.match(/\.(-?\d+)$/);
@@ -22,14 +24,20 @@ function stages(rule: string): Stage[] {
     selector = selector.replace(/^class\./, '.').replace(/^id\./, '#').replace(/^tag\./, '');
     try { compile(selector); }
     catch { throw new UnsupportedSearchRule('暂不支持选择器：' + raw); }
-    return { selector, ...(index ? { index: Number(index[1]) } : {}), ...(exclude ? { exclude: Number(exclude[1]) } : {}) };
+    return { selector, ...(index ? { index: Number(index[1]) } : {}), ...(exclude ? { exclude: Number(exclude[1]) } : {}), ...(range ? { slice: [Number(range[1]), Number(range[2])] as [number, number] } : {}) };
   });
 }
 
 function select(nodes: RuleNode[], steps: Stage[]): RuleNode[] {
   return steps.reduce((current, step) => current.flatMap(node => {
     const found = selectAll(step.selector, node);
-    const filtered = step.exclude === undefined ? found : found.filter((_, index) => index !== step.exclude);
+    let filtered = step.exclude === undefined ? found : found.filter((_, index) => index !== step.exclude);
+    if (step.slice) {
+      const [start, end] = step.slice;
+      // Legado includes the end index, including when counted from the end.
+      const last = end < 0 ? filtered.length + end : end;
+      filtered = last < 0 ? [] : filtered.slice(start, last + 1);
+    }
     if (step.index === undefined) return filtered;
     const index = step.index < 0 ? filtered.length + step.index : step.index;
     return filtered[index] ? [filtered[index]] : [];

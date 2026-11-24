@@ -1,0 +1,84 @@
+[
+  {
+    "bookSourceName": "哔哩轻小说",
+    "bookSourceUrl": "https://w.linovelib.com",
+    "bookSourceType": 0,
+    "searchUrl": "<js>\nif(!cache.get(\"ua2\")){   \n\th=JSON.parse(java.ajax(\"https://raw.githubusercontent.com/microlinkhq/top-user-agents/master/src/desktop.json\"))\njava.log(h.length)\nx =Math.floor(Math.random() *h.length)\njava.log(h[x])\t\ncache.put(\"ua2\", h[x],86400);\n    \t}else{java.log(cache.get(\"ua2\"))}\npage==1?\n\"/search.html?searchkey={{key}}&searchtype=all,{'webView': true}\"\n:\n\n\"/search/{{key}}_{{page}}.html,{'webView': true}\"\n</js>",
+    "ruleSearch": {
+      "author": "class.book-author@textNodes",
+      "bookList": "@js:\npath = 'class.book-ol book-ol-normal@tag.li';\nc=java.getElement(path);\nif( !c.length && result.includes('no-js')){\n  res = java.startBrowserAwait(baseUrl,'等待至跳转，然后重搜');\n                AimTime = Date.now()+3000;\n                while(AimTime > Date.now()){}\n  result = java.ajax(baseUrl)//ajax result after wait\n  java.log(result)\n  java.setContent(result)\n  c=java.getElement(path);\n}\nif(!c.length){\n\tc=[result]\n\t}\nc",
+      "bookUrl": "tag.a.0@href",
+      "checkKeyWord": "我的青春恋爱喜剧",
+      "coverUrl": "[property=\"og:image\"]@content||a@href@js:\nvar id = result.match(/\\/(\\d+)\\.html/)[1];\n'https://www.linovelib.com/files/article/image/'+parseInt(id/1000)+'/'+id+'/'+id+'s.jpg';",
+      "intro": "id.bookSummary@tag.content@textNodes||\nclass.book-desc@text",
+      "kind": "class.tag-small-group origin-right@tag.em@text||\nclass.book-cell@tag.p.1@ownText&&class.tag-small red@text\n##.*万字|·.*",
+      "name": "class.book-title.0@text"
+    },
+    "header": "<js>\n\n    var ua = cache.get(\"ua2\") ? cache.get(\"ua2\"):\"Mozilla/5.0 (Linux; Android 9; SM-G955F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.101 Mobile Safari/537.36\";\n    //在沒有新ua的時候用一個preset的隨機ua\n    var headers = {\n    \t\"User-Agent\": ua,\n    \"Referer\":\"https://w.linovelib.com/\"}; JSON.stringify(headers);\n\n</js>"
+  },
+  {
+    "bookSourceName": "🍩笔趣阁yyk[自写]",
+    "bookSourceUrl": "https://www.yuyouku.com/#xsw8093",
+    "bookSourceType": 0,
+    "searchUrl": "@js:\nvar su=source.getKey()\nvar htmlUrl=java.get(su,{}).headers('Location')\njava.log(`重定向：${htmlUrl[0]}`)\nvar posturl=htmlUrl[0]?htmlUrl[0]:(su.includes(\"#\")?su.match(/([^\\#]+)\\#/)[1]:su)\nposturl = posturl.slice(-1)=='/'?posturl.slice(0,-1):posturl\ncookie.removeCookie(posturl)\njava.log(`请求：${posturl}`)\n\n\nvar html = java.ajax(posturl);\n\nsearch = org.jsoup.Jsoup.parse(html).select('form[role=form]').attr('action');\n\n\nposturl+search+\"?keyword={{key}},\"+JSON.stringify({\r\n  \"method\": \"GET\"\r\n})",
+    "ruleSearch": {
+      "author": "div.3@text",
+      "bookList": ".list-group-item[1:-2]",
+      "bookUrl": "div.1@a@href",
+      "checkKeyWord": "剑来",
+      "coverUrl": "",
+      "intro": "",
+      "kind": "div.0@i@text",
+      "lastChapter": "div.2@a@text",
+      "name": "div.1@a@text",
+      "wordCount": ""
+    },
+    "header": "{\n    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36',\n    \"Cookie\":\"0\"\n}"
+  },
+  {
+    "bookSourceName": "起点男频",
+    "bookSourceUrl": "https://m.qidian.com",
+    "bookSourceType": 0,
+    "searchUrl": "/so/{{key}}.html?pageNum={{page}}",
+    "ruleSearch": {
+      "author": "/a/div/div/p/text()||/a/div/div/p/mark/text()",
+      "bookList": "//*[@class=\"y-list__item\"]",
+      "bookUrl": "{{@@a.0@href##chapter##book}}##\\/0\\/##.html",
+      "checkKeyWord": "不死不灭",
+      "coverUrl": "/a/div/img/@data-src",
+      "intro": "/a/div/p@text",
+      "kind": "{{//*[@class=\"y-list__item\"]/a/div/div/div/p[1]/text()&&//*[@class=\"y-list__item\"]/a/div/div/div/p[2]/text()}}",
+      "name": "/a/div/img/@alt##在线阅读",
+      "wordCount": "/a/div/div/div/p[3]/text()"
+    }
+  },
+  {
+    "bookSourceName": "笔趣庭",
+    "bookSourceUrl": "https://m.biquting.org/",
+    "bookSourceType": 0,
+    "searchUrl": "<js>\nurl = source.key+\"/search.html?keyword=\"+java.encodeURI(key);\nresult=java.webView(\"\",url,\"\");\nid=result.match(/name=\"id\" value=\"(.*?)\"/)[1];\nurl=result.match(/src=\"(data:image.*?)\"/)[1];\ncode=java.getVerificationCode(url);\nsource.key+\"/search.html?id=\"+id+\"&keyword=\"+java.encodeURI(key)+\"&code=\"+code\n</js>",
+    "ruleSearch": {
+      "author": ".info@span@text##作者：",
+      "bookList": ".clearfix@li",
+      "bookUrl": ".tit@href",
+      "intro": ".intro@text",
+      "kind": ".type@text",
+      "name": ".tit@text"
+    },
+    "header": "{\"User-Agent\":\"Mozilla/5.0 (Linux; Android 14; 2211133C Build/UKQ1.230804.001) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.165 Mobile Safari/537.36\"}"
+  },
+  {
+    "bookSourceName": "笔趣阁94",
+    "bookSourceUrl": "https://m.bg94.cc",
+    "bookSourceType": 0,
+    "searchUrl": "https://m.bg94.cc/s?q={{key}},{\"webView\": true}",
+    "ruleSearch": {
+      "author": "span@text",
+      "bookList": ".item",
+      "bookUrl": "dt a@href",
+      "checkKeyWord": "剑来",
+      "intro": "dd@text",
+      "name": "dt a@text"
+    }
+  }
+]

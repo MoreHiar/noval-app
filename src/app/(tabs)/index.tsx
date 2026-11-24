@@ -4,30 +4,19 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookCarousel } from '../../components/BookCarousel';
 import { BookCard } from '../../components/BookCard';
+import { ShelfButton } from '../../components/ShelfButton';
 import { theme } from '../../components/theme';
 import { Book } from '../../domain/books';
 import { useLibrary } from '../../state/library';
 
 export default function ShelfScreen() {
-  const { shelfBooks: books, setBookOnShelf, ready, storageError, retryLoad } = useLibrary();
+  const { shelfBooks: books, ready, storageError, retryLoad } = useLibrary();
   const insets = useSafeAreaInsets();
   const [requestedIndex, setSelectedIndex] = useState(0);
-  const [removingKey, setRemovingKey] = useState('');
-  const [shelfError, setShelfError] = useState('');
   const [listMode, setListMode] = useState(false);
   const select = useCallback((index: number) => setSelectedIndex(index), []);
 
-  const removeBook = async (book: Book) => {
-    setShelfError(''); setRemovingKey(`${book.sourceId}/${book.id}`);
-    try { await setBookOnShelf(book, false); }
-    catch (error) { setShelfError(error instanceof Error ? error.message : '移除失败，请重试。'); }
-    finally { setRemovingKey(''); }
-  };
-  const removeButton = (book: Book) => (
-    <Pressable style={styles.removeButton} onPress={() => removeBook(book)} disabled={!!removingKey || !ready} accessibilityRole="button" accessibilityLabel={`将${book.title}从书架移除`} accessibilityState={{ disabled: !!removingKey || !ready }}>
-      <Text style={styles.removeText}>{removingKey === `${book.sourceId}/${book.id}` ? '正在移除…' : '从书架移除'}</Text>
-    </Pressable>
-  );
+  const removeButton = (book: Book) => <ShelfButton book={book} compact removeOnly />;
 
   const selectedIndex = Math.min(requestedIndex, Math.max(books.length - 1, 0));
   const selectedBook = books[selectedIndex];
@@ -48,7 +37,6 @@ export default function ShelfScreen() {
           <Pressable onPress={() => setListMode((current) => !current)} style={styles.modeButton} accessibilityRole="button" accessibilityLabel={listMode ? '切换立体书架' : '切换列表'}><Text style={styles.modeIcon}>{listMode ? '▥' : '☷'}</Text></Pressable>
         </View>
       </View>
-      {shelfError ? <Text accessibilityRole="alert" style={styles.error}>{shelfError}</Text> : null}
       {!ready ? (
         <View style={styles.empty}>
           <Text accessibilityRole={storageError ? 'alert' : undefined} style={styles.emptyBody}>{storageError || '正在加载书架…'}</Text>

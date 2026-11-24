@@ -18,7 +18,7 @@ export default function ProfileScreen() {
         <View style={styles.divider} />
         <View style={styles.stat}><Text style={styles.value}>{sources.length}</Text><Text style={styles.label}>已启用书源</Text></View>
       </View>
-      <Text style={styles.note}>阅读进度与设置将在下一阶段加入。</Text>
+      <Text style={styles.note}>阅读进度自动保存在本机，打开书籍即可继续阅读。</Text>
     </Page>
   );
 }

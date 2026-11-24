@@ -14,6 +14,10 @@ test('relay only accepts configured exact hosts, normal web ports and public DNS
   assert.equal(validateSourceTarget('https://appi.kuwo.cn/novels/api/book/search').hostname, 'appi.kuwo.cn');
   assert.equal(validateSourceTarget('https://www.sudugu.cc/modules/article/search.php').hostname, 'www.sudugu.cc');
   assert.equal(validateSourceTarget('https://novel.snssdk.com/api/novel/channel/homepage/search/search/v1/').hostname, 'novel.snssdk.com');
+  assert.equal(validateSourceTarget('https://m.cuoceng.org/book/so/test/1.html').hostname, 'm.cuoceng.org');
+  assert.equal(validateSourceTarget('https://www.yingsx.com/cse/search?q=test').hostname, 'www.yingsx.com');
+  assert.equal(validateSourceTarget('https://m.qidian.com/so/test.html').hostname, 'm.qidian.com');
+  assert.equal(validateSourceTarget('https://www.yuyouku.com/search').hostname, 'www.yuyouku.com');
   for (const url of ['http://127.0.0.1', 'http://169.254.169.254', 'file:///etc/passwd', 'https://appi.kuwo.cn.evil.test', 'https://appi.kuwo.cn:1234', 'https://user:secret@appi.kuwo.cn', 'http://[::1]']) assert.throws(() => validateSourceTarget(url));
   for (const address of ['127.0.0.1', '10.0.0.1', '192.168.1.2', '169.254.169.254', '100.64.0.2', '::1', '::ffff:127.0.0.1', 'fe80::1', 'fc00::1']) assert.equal(isPublicAddress(address), false, address);
   assert.equal(isPublicAddress('8.8.8.8'), true);

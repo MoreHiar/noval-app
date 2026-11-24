@@ -12,7 +12,12 @@ const sourceHosts = new Set([
   'www.shoujix.com', 'www.23qb.com', 'm.laikan9.com', 'www.wcxsw.org', 'www.siluke.com',
   'www.ddxs.com', 'hetushu.com', 'm.aitbooks.com', 'm.suixkan.com', 'www.92xs.info',
   'www.81zw2.com', 'www.50zw.so',
-  'novel.snssdk.com',
+  'novel.snssdk.com', 'fanqienovel.com',
+  'm.qidian.com', 'www.yuyouku.com',
+  // Exact public sites in the user-selected Yiove default collection.
+  'm.cuoceng.org', 'm.jhssd.com', 'm.libahao.com', 'm.powenwu16.com', 'www.20xs.org',
+  'www.38xs.com', 'www.biquge7.top', 'www.biquges123.com', 'www.biqusa.com', 'www.kanshuw.com',
+  'www.kxwx.org', 'www.sudugu.org', 'www.yingsx.com',
 ]);
 const blockedV4 = new BlockList();
 const blockedV6 = new BlockList();

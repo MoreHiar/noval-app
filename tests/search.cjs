@@ -13,6 +13,7 @@ require.extensions['.ts'] = (module, filename) => {
 const { buildSearchRequest, createLegadoSearchAdapter } = require('../src/sources/legado-search.ts');
 const { fanqieDocument } = require('../src/sources/fanqie.ts');
 const { searchSources, summarizeSearch } = require('../src/sources/search.ts');
+const fiveSources = require('./fixtures/five-source-search.json');
 
 const document = {
   bookSourceName: '测试来源', bookSourceUrl: 'https://fixture.example',
@@ -20,6 +21,80 @@ const document = {
   ruleSearch: { bookList: 'class.item', name: 'tag.h3.0@tag.a.0@text', author: 'tag.p.1@tag.a.0@text##作者：', bookUrl: 'tag.a.0@href', intro: '.intro@text' },
 };
 const html = '<script>const unused = "<div>";</script><div class="item"><h3><a href="../book/1?a=1&amp;b=2">书生 &amp; 山海</a></h3><p>玄幻</p><p><a>作者：某人</a></p><p class="intro">故事 &lt;开始&gt;</p></div>';
+
+test('user-provided Qidian XPath definition searches the current SSR layout without altering stored rules', async t => {
+  const source = fiveSources[2];
+  const before = JSON.stringify(source);
+  t.mock.method(globalThis, 'fetch', async url => {
+    assert.equal(new URL(url).pathname, '/so/不死不灭.html'.replace('不死不灭', encodeURIComponent('不死不灭')));
+    return new Response('<a data-bid="20117" href="//m.qidian.com/chapter/20117/0/"><div><img data-src="//bookcover.yuewen.com/qdbimg/349573/20117/180" alt="不死不灭在线阅读"></div><div><h2>不死不灭</h2><p class="_searchBookDesc_hash">故事简介</p><div><p class="_searchBookAuthor_hash">辰东</p><div class="_tags_hash"><p>武侠</p><p>完结</p><p>79万字</p></div></div></div></a>');
+  });
+  const adapter = createLegadoSearchAdapter(source);
+  assert.equal(adapter.searchUnavailableReason, undefined);
+  const [book] = await adapter.search('不死不灭');
+  assert.equal(book.title, '不死不灭');
+  assert.equal(book.author, '辰东');
+  assert.equal(book.summary, '故事简介');
+  assert.equal(book.category, '武侠 完结');
+  assert.equal(book.coverUrl, 'https://bookcover.yuewen.com/qdbimg/349573/20117/180');
+  assert.equal(book.id.slice(4).match(/.{4}/g).map(hex => String.fromCharCode(parseInt(hex,16))).join(''), 'https://m.qidian.com/book/20117.html');
+  assert.equal(JSON.stringify(source), before);
+  const modified = structuredClone(source);
+  modified.ruleSearch.bookList = '//*[@class="something-else"]';
+  assert.ok(createLegadoSearchAdapter(modified).searchUnavailableReason);
+});
+
+test('known Yuyouku script discovers a same-origin form, encodes keywords, and respects inclusive list slicing', async t => {
+  const before = JSON.stringify(fiveSources[1]);
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async url => {
+    calls++;
+    if (calls === 1) return new Response('<form role="form" action="/search?scope=books"></form>');
+    assert.equal(new URL(url).searchParams.get('keyword'), '剑 & 来');
+    assert.equal(new URL(url).searchParams.get('scope'), 'books');
+    const row = title => `<li class="list-group-item"><div><i>仙侠</i></div><div><a href="/book/1">${title}</a></div><div><a>新章节</a></div><div>作者</div></li>`;
+    return new Response(row('表头')+row('剑来')+row('最后一本')+row('页码'));
+  });
+  const adapter = createLegadoSearchAdapter(fiveSources[1]);
+  assert.equal(adapter.searchUnavailableReason, undefined);
+  // Identical book links deduplicate; the final footer must not replace the book title.
+  assert.deepEqual((await adapter.search('剑 & 来')).map(book => book.title), ['最后一本']);
+  assert.equal(calls, 2);
+  assert.equal(JSON.stringify(fiveSources[1]), before);
+});
+
+test('form discovery rejects external actions, missing forms and cancellation before a second request', async t => {
+  for (const action of ['https://other.example/search', 'https://user:secret@www.yuyouku.com/search', 'javascript:alert(1)', '']) {
+    const stub = t.mock.method(globalThis, 'fetch', async () => new Response(`<form role="form" action="${action}"></form>`));
+    await assert.rejects(createLegadoSearchAdapter(fiveSources[1]).search('书'), /表单|其他网站/);
+    assert.equal(stub.mock.callCount(), 1);
+    stub.mock.restore();
+  }
+  const controller = new AbortController();
+  const stub = t.mock.method(globalThis, 'fetch', async () => { controller.abort(); return new Response('<form role="form" action="/search"></form>'); });
+  await assert.rejects(createLegadoSearchAdapter(fiveSources[1]).search('书', controller.signal), { name: 'AbortError' });
+  assert.equal(stub.mock.callCount(), 1);
+});
+
+test('browser sources use the shared browser session without executing supplied scripts', async t => {
+  const stub = t.mock.method(globalThis, 'fetch', async () => { throw new Error('must not request'); });
+  const browser = require('../src/sources/browser-session.ts');
+  const requests=[];
+  t.mock.method(browser,'loadBrowserPage',async request=>{
+    requests.push(request);
+    return {url:request.url,html:request.source==='linovelib'?'<ol class="book-ol"><li><h3 class="book-title"><a href="/novel/1.html">剑来</a></h3></li></ol>':request.source==='biquting'?'<ul class="clearfix"><li><a class="tit" href="/book/1/">剑来</a></li></ul>':'<dl class="item"><dt><a href="/book/1/">剑来</a></dt></dl>'};
+  });
+  for (const index of [0,3,4]) {
+    const adapter = createLegadoSearchAdapter(fiveSources[index]);
+    assert.equal(adapter.searchUnavailableReason,undefined);
+    assert.equal((await adapter.search('剑来'))[0].title,'剑来');
+  }
+  assert.deepEqual(requests.map(item=>item.source),['linovelib','biquting','bg94']);
+  const modified = { ...fiveSources[1], searchUrl: fiveSources[1].searchUrl + ';globalThis.injected=true' };
+  assert.match(createLegadoSearchAdapter(modified).searchUnavailableReason, /脚本/);
+  assert.equal(stub.mock.callCount(), 0);
+  assert.equal(globalThis.injected, undefined);
+});
 
 test('real Legado traversal format extracts title, author, entities and relative links; deduplicates stable IDs', async t => {
   let calls = 0;

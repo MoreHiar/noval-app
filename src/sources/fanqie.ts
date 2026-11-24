@@ -6,7 +6,7 @@ export const fanqieDocument: RuleSourceDocument = {
   bookSourceUrl: 'https://novel.snssdk.com',
   bookSourceType: 0,
   bookSourceGroup: '内置',
-  bookSourceComment: '番茄公开搜索接口；支持搜索信息和封面，目录与正文尚未接入。',
+  bookSourceComment: '番茄公开搜索与阅读页面；支持搜索、目录及公开章节正文。',
   enabled: true,
   enabledExplore: false,
   searchUrl: 'https://novel.snssdk.com/api/novel/channel/homepage/search/search/v1/?aid=1967&offset={{(page-1)*10}}&q={{key}}',

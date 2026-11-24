@@ -1,6 +1,5 @@
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Book, ManagedSource, SourceAdapter, RuleSourceDocument } from '../domain/books';
-import { fanqieSource } from '../sources/fanqie';
 import { javascriptDocument, javascriptExampleSource } from '../sources/javascript';
 import { bookKey, deleteDefinition, deleteRuleSources, getShelfBooks, LibraryData, mergeSources, parseSourceImport, saveDefinition, setAllRuleSourcesEnabled, setShelfBook } from '../sources/management';
 import { loadLibrary, loadShelfBook, saveLibrary } from '../storage/library';
@@ -31,11 +30,8 @@ type LibraryState = {
 
 const initialData: LibraryData = {
   version: 1,
-  definitions: [
-    fanqieSource(),
-    { document: javascriptDocument, enabled: true, kind: 'javascript' },
-  ],
-  shelf: ['js-example/clock'],
+  definitions: [],
+  shelf: [],
 };
 const LibraryContext = createContext<LibraryState | null>(null);
 

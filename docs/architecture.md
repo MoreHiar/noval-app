@@ -4,7 +4,7 @@
 
 Noval 是多书源小说阅读器。Android、iOS 使用 Expo 构建原生应用；macOS 第一阶段通过同一套 React Native Web 界面运行在浏览器中，正式桌面交付采用 Tauri 外壳打包 Expo 的单页 Web 构建。macOS 的网络与文件访问在桌面外壳中实现适配，不把 Expo/EAS 的 iOS 构建当作 macOS 构建。界面按窄屏优先设计，宽屏限制正文宽度。
 
-当前提供可切换的立体书架、跨源搜索、书籍详情、目录、正文阅读及阅读 / Legado 规则书源管理。番茄小说为内置在线搜索源；可信 JavaScript 示例提供离线阅读内容。
+当前提供可切换的立体书架、跨源搜索、书籍详情、目录、正文阅读及阅读 / Legado 规则书源管理。番茄小说支持公开目录及公开章节阅读；可信 JavaScript 示例提供离线阅读内容。
 
 书架采用 `Animated` 透视变换与横向手势切换，也可切换为普通列表。底部导航在支持的 iOS 26 设备上使用系统 Liquid Glass；其他 iOS 版本与 Web 使用 `expo-blur`，Android 使用半透明玻璃外观作为回退。新增的两个 Expo 模块均在 Expo Go 中可用。
 
@@ -17,6 +17,8 @@ src/state               书源及书架状态与本地持久化
 src/domain/books.ts     书、章节及 SourceAdapter 契约
 src/sources             内置、JSON、可信 JS 和 Legado 搜索适配器
 src/server              Web 书源转发服务实现
+src/storage             SQLite 书架、阅读进度与版本迁移
+src/reader              分页、翻页边界与站点字体加载
 ```
 
 可执行书源遵循相同的 `SourceAdapter`：`search`、`getBook`、`getChapters`、`getChapter`。书籍身份是 `(sourceId, bookId)`，避免不同书源的本地 ID 冲突。发现页对各源并发搜索，并保留成功源的结果；单一源报错不会让整个搜索失败。
@@ -27,9 +29,9 @@ src/server              Web 书源转发服务实现
 
 网站书源使用阅读 / Legado 格式，以 `bookSourceName`、`bookSourceUrl`、`searchUrl`、`ruleSearch`、`ruleBookInfo`、`ruleToc`、`ruleContent` 等字段描述请求和提取规则。保留未知字段、脚本、请求头、登录及发现配置。新增及编辑、网络地址导入、本地 JSON 文件／粘贴导入、单个／批量导出均使用这个交换格式。重复项按 `bookSourceUrl` 识别，内部 ID 由地址编码生成，导出时不添加内部包装。
 
-可信 JS 示例随应用打包，用于体验现有书架和阅读链路，不出现在网站规则书源管理中，也不混入规则书源导出。旧 `sample-library` 演示书库在数据加载时移除；番茄默认源会补入已有用户数据，并保留其禁用状态。
+可信 JS 示例随应用打包，用于体验现有书架和阅读链路，不出现在网站规则书源管理中，也不混入规则书源导出。当前默认四源为哔哩轻小说、起点男频、笔趣庭和笔趣阁94；静态／可信 JS 适配器保留执行能力，不自动加入示例书。
 
-**当前边界：** 已实现规则配置管理、在线搜索适配器和在线收藏。已启用书源参与搜索；支持简单 GET／POST、CSS／Legado 选择器、基础 JSONPath、末尾字符串等值过滤和正则替换。脚本、XPath、复杂 JSONPath、非 UTF-8 编码等必填规则在请求前报告未支持原因。详情页展示搜索信息，支持加入书架和移除；在线详情抓取、目录及正文尚未接入。导入成功不代表网站一定可访问或能通过防护验证。
+**当前边界：** 已实现规则配置管理、在线搜索适配器和在线收藏。已启用书源参与搜索；支持简单 GET／POST、CSS／Legado 选择器、基础 JSONPath、末尾字符串等值过滤和正则替换。脚本、XPath、复杂 JSONPath、非 UTF-8 编码等必填规则在请求前报告未支持原因。内置番茄另有专用公开详情／目录／正文适配器；其他导入规则源仍只接入搜索。导入成功不代表网站一定可访问或能通过防护验证。
 
 **脚本边界：** 不在应用主 JavaScript 环境中对用户提供的代码使用 `eval`、`Function` 或动态导入。规则中的 JavaScript 作为字符串保存及导出。后续按需要实现隔离执行宿主和 `java` 兼容接口、其他编码、XPath、复杂 JSONPath、复杂模板与分页。
 
@@ -39,7 +41,11 @@ src/server              Web 书源转发服务实现
 
 当前使用 `expo-sqlite` 的 `noval-library.db` 保存书源定义、启用状态和书架。`src/storage/library-database.ts` 管理 SQL 和事务，`library.ts` 管理连接及旧 AsyncStorage 数据的一次性迁移。`library_settings` 保存书源配置，`shelf_books` 以 `(source_id, book_id)` 为主键保存顺序和有长度限制的收藏信息，仅保存封面链接，不下载图片或正文。所有读写串行执行，书源与收藏修改同一事务提交，成功落盘后更新界面；首次加载失败时禁止修改并支持重试，不覆盖已有数据。移除收藏删除对应行，数据库空闲页可重用；删除源清理关联收藏，修改源地址迁移引用及元数据，禁用或覆盖源保留收藏。导入重复项默认跳过，可显式覆盖。格式与导入说明见 [book-sources.md](./book-sources.md)。
 
-后续在 SQLite 中增加阅读进度、章节元数据和缓存索引；正文按章节缓存，设置容量上限与过期策略，图片缓存独立清理。新增数据使用版本化迁移。搜索请求需去抖、取消过期结果、按源限流；列表虚拟化并给封面固定尺寸。阅读器需增加字号、行距、主题、翻页方式和进度同步。Web 同样使用 SQLite WebAssembly，通过 Metro 和托管服务器的 COOP／COEP 响应头支持 SharedArrayBuffer。
+数据库 schema 2 新增 `reading_progress`，以 `(source_id, book_id)` 保存章节 ID、标题、页首字符偏移及更新时间。翻页防抖保存，离开阅读页和应用进入后台时刷新待写进度；旧时间戳不覆盖新进度。保留所有收藏书籍的进度及最近 200 本未收藏书籍的进度，移除收藏或删除源时清理对应进度。schema 1 自动升级并保留书架，拒绝打开更高版本数据库。Web 同样使用 SQLite WebAssembly，通过 Metro 和托管服务器的 COOP／COEP 响应头支持 SharedArrayBuffer。
+
+当前 schema 4 增加 `library_backups`，按用户要求先备份旧书源、书架和阅读进度，再在同一事务清空活动数据。`SOURCE_RESET_ID` 标记这次一次性重置，生产仓储通过 `resetSources: true` 启用；后续加载不再次清空。已取消所有默认源安装和旧番茄保护，Yiove JSON 快照已移除。已按用户最新选择以新标记补入四源默认集合，并关闭生产环境的再次清空。
+
+`sources/reading.ts` 只解析番茄公开页面的 JSON 数据，不执行站点脚本；校验书籍／章节身份，保留锁定状态，正文按需请求。目录使用 FlatList，仅在内存保留两本目录（五分钟有效）和最近三章正文，不新增正文落盘。站点特殊字形使用页面声明的可信字体，最多同时加载三份。阅读器原生端依据 Text 的行布局分页，Web 使用保守估算；字符偏移用于屏幕变化后重新定位。正文区域左滑下一页、右滑上一页，跨章时下一章进入首页、上一章进入末页；保留可访问的翻页按钮。字号、主题及跨设备进度同步仍待实现。
 
 建议的持久化表以 `source_id` 加本地 ID 作复合键：`sources` 保存类型、配置版本和启用状态；`books` 保存规范化元数据；`shelf` 保存收藏顺序；`chapters` 保存目录；`chapter_cache` 保存正文、大小和访问时间；`reading_progress` 保存章节 ID、段落位置和更新时间。迁移必须可回滚或可从书源重新构建缓存。UI 只依赖仓储接口，避免 SQLite、Web IndexedDB 和桌面外壳实现渗入页面。
 
@@ -83,3 +89,9 @@ npx tsc --noEmit
 - [XIU2 阅读书源](https://yuedu.xiu2.xyz/)
 
 已读取 Expo SDK 58 及相应模块的版本文档，并结合本地类型和 CLI 核对 API。
+
+## 四源适配与浏览器宿主
+
+`qidian-reader.ts` 解析当前站点 SSR JSON，提供分卷目录／锁定状态／正文，正文仅保留三章内存。`browser-reader.ts` 为另外三个确认站点解析浏览器 DOM，限制章节归属和分页。`browser-session.ts` 是客户端等待队列，根布局挂载平台 `SourceBrowser`：原生使用 Expo Go 内置的 WebView，Web 连接 `source-browser+api.ts` 的 Playwright Node 服务。验证码在可见窗口由用户完成，成功匹配目标 DOM 后才继续。
+
+服务端浏览器不进入客户端打包，使用 Node `createRequire` 加载驱动。浏览器会话按随机 capability ID 隔离、六份上限、三十分钟闲置清理；请求限定同源 JSON、已确认的 HTTPS 导航域名和公网资源地址。部署 Web 需另提供 Chromium 或 Chrome；原生不依赖此 Node 浏览器服务。默认四源以 `default_source_bundles` 事务标记一次性补入，用户同地址修改优先，删除后不重建。

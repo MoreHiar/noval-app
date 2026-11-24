@@ -1,9 +1,17 @@
 import JSON5 from 'json5';
+import { parseDocument } from 'htmlparser2';
+import { selectAll } from 'css-select';
 import type { Book, RuleSourceDocument, SourceAdapter } from '../domain/books';
 import { ruleSourceId } from './legado';
 import { compileFieldRule, compileListRule, UnsupportedSearchRule } from './legado-rules';
 import { fetchSearchResponse } from './search-transport';
-import { isLegacySuduguSearch, knownSearchCover, searchRulesFor } from './search-compat';
+import { isLegacyQidianSearch, isLegacySuduguSearch, isYuyoukuFormSearch, knownSearchCover, searchRulesFor } from './search-compat';
+import { isFanqieSourceId } from './fanqie';
+import { createFanqieReader } from './reading';
+import { browserSearch, browserSearchRules } from './browser-search';
+import { loadBrowserPage } from './browser-session';
+import { createQidianReader } from './qidian-reader';
+import { createBrowserReader } from './browser-reader';
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
 const TIMEOUT_MS = 20000;
@@ -35,8 +43,10 @@ function headersFrom(value: unknown): Record<string, string> {
 }
 
 export function buildSearchRequest(document: RuleSourceDocument, keyword: string) {
-  const endpoint = document.searchUrl?.trim();
+  const endpoint = browserSearch(document,keyword)?.url ?? (isYuyoukuFormSearch(document) ? 'https://www.yuyouku.com/' : document.searchUrl?.trim());
   if (!endpoint) throw new UnsupportedSearchRule('此书源没有搜索地址。');
+  if (/java\.getVerificationCode\s*\(/.test(endpoint)) throw new UnsupportedSearchRule('此书源搜索需要浏览器会话和人工验证码；当前尚未接入验证流程，配置完整也不能直接搜索。');
+  if (/@js:|<js>/i.test(endpoint) && /webView|startBrowser/.test(endpoint)) throw new UnsupportedSearchRule('此书源需要浏览器执行网页、保留会话并处理验证，当前尚未接入该能力。');
   if (/@js:|<js>/i.test(endpoint)) throw new UnsupportedSearchRule('此书源的搜索地址需要脚本支持。');
   const boundary = endpoint.search(/,\s*\{/);
   let options: RequestOptions = {};
@@ -45,7 +55,9 @@ export function buildSearchRequest(document: RuleSourceDocument, keyword: string
     try { raw = JSON5.parse(endpoint.slice(boundary + 1)); }
     catch { throw new UnsupportedSearchRule('搜索请求参数格式暂不支持。'); }
     if (!record(raw)) throw new UnsupportedSearchRule('搜索请求参数必须是对象。');
-    if (Object.keys(raw).some(key => !['method', 'body', 'charset', 'headers'].includes(key))) throw new UnsupportedSearchRule('此书源含尚未支持的搜索请求选项。');
+    if (raw.webView === true) throw new UnsupportedSearchRule('此书源设置了 webView: true，需要浏览器加载搜索页；当前仅支持直接网络请求，尚未接入 WebView 搜索。');
+    const unsupported = Object.keys(raw).filter(key => !['method', 'body', 'charset', 'headers'].includes(key));
+    if (unsupported.length) throw new UnsupportedSearchRule('此书源含尚未支持的搜索请求选项：' + unsupported.join('、'));
     options = raw as RequestOptions;
   }
   if (options.charset && !/^utf-?8$/i.test(options.charset)) throw new UnsupportedSearchRule('此书源使用 ' + options.charset + ' 编码，尚未接入。');
@@ -58,7 +70,7 @@ export function buildSearchRequest(document: RuleSourceDocument, keyword: string
   const method = (options.method ?? 'GET').toUpperCase();
   if (!['GET', 'POST'].includes(method)) throw new UnsupportedSearchRule('暂不支持此搜索请求方法：' + method);
   if (options.body !== undefined && (typeof options.body !== 'string' || method !== 'POST')) throw new UnsupportedSearchRule('暂仅支持 POST 文字请求体。');
-  const headers = { ...headersFrom(document.header), ...headersFrom(options.headers) };
+  const headers = browserSearch(document,keyword) ? {} : { ...headersFrom(document.header), ...headersFrom(options.headers) };
   if (options.body !== undefined && !Object.keys(headers).some(key => key.toLowerCase() === 'content-type')) headers['Content-Type'] = 'application/x-www-form-urlencoded';
   const url = new URL(httpUrl(interpolate(boundary < 0 ? endpoint : endpoint.slice(0, boundary)), document.bookSourceUrl.trim()));
   // This legacy source advertises HTTP, but its identical HTTPS endpoint is available.
@@ -72,10 +84,31 @@ export function buildSearchRequest(document: RuleSourceDocument, keyword: string
   };
 }
 
+async function resolveSearchRequest(document: RuleSourceDocument, keyword: string, signal: AbortSignal) {
+  const request = buildSearchRequest(document, keyword);
+  if (!isYuyoukuFormSearch(document)) return request;
+  const response = await fetchSearchResponse(request, signal);
+  if (!response.ok) throw new Error('获取搜索表单失败（HTTP ' + response.status + '）。');
+  if (Number(response.headers.get('content-length')) > MAX_RESPONSE_SIZE) throw new Error('搜索响应超过 5 MB。');
+  const body = await response.text();
+  if (body.length > MAX_RESPONSE_SIZE) throw new Error('搜索响应超过 5 MB。');
+  signal.throwIfAborted();
+  const base = new URL(response.url || request.url);
+  if (base.origin !== new URL(request.url).origin) throw new Error('书源已跳转到其他网站，需先更新并确认搜索规则。');
+  const action = selectAll('form[role="form"]', parseDocument(body))
+    .map(node => 'attribs' in node && record(node.attribs) ? node.attribs.action : undefined)
+    .find((value): value is string => typeof value === 'string' && !!value);
+  if (!action) throw new Error('网站未返回搜索表单，可能存在验证或页面结构已变化。');
+  const target = new URL(action, base);
+  if (target.origin !== base.origin || target.username || target.password) throw new Error('搜索表单指向其他网站或无效地址，已停止请求。');
+  target.searchParams.set('keyword', keyword);
+  return { ...request, url: target.toString() };
+}
+
 function compileSearch(document: RuleSourceDocument) {
   if (document.bookSourceType !== undefined && document.bookSourceType !== 0) throw new UnsupportedSearchRule('搜索暂仅支持文本书源。');
   buildSearchRequest(document, 'test');
-  const rules = searchRulesFor(document);
+  const rules = browserSearch(document,'test') ? browserSearchRules(document) : searchRulesFor(document);
   const list = compileListRule(rules.bookList);
   if (typeof rules.name !== 'string' || !rules.name.trim() || typeof rules.bookUrl !== 'string' || !rules.bookUrl.trim()) throw new UnsupportedSearchRule('缺少书名或书籍链接搜索规则。');
   const name = compileFieldRule(rules.name);
@@ -95,6 +128,7 @@ function aborted(): Error {
 
 export function createLegadoSearchAdapter(document: RuleSourceDocument, getSavedBook?: (bookId: string) => Promise<Book | null>): SourceAdapter {
   const sourceId = ruleSourceId(document);
+  const reader = isFanqieSourceId(sourceId) ? createFanqieReader(sourceId) : isLegacyQidianSearch(document) ? createQidianReader(sourceId) : browserSearch(document,'test') ? createBrowserReader(document) : undefined;
   const cache = new Map<string, Book>();
   let compiled: ReturnType<typeof compileSearch> | undefined;
   let searchUnavailableReason: string | undefined;
@@ -107,14 +141,17 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument, getSaved
       if (signal?.aborted) throw aborted();
       if (!query.trim()) return [];
       if (!compiled) throw new UnsupportedSearchRule(searchUnavailableReason);
-      const request = buildSearchRequest(document, query.trim());
       const controller = new AbortController();
       const cancel = () => controller.abort();
       signal?.addEventListener('abort', cancel);
       let timedOut = false;
-      const timer = setTimeout(() => { timedOut = true; cancel(); }, TIMEOUT_MS);
+      const browser = browserSearch(document,query.trim());
+      const timer = setTimeout(() => { timedOut = true; cancel(); }, browser ? 300000 : TIMEOUT_MS);
       try {
-        const response = await fetchSearchResponse(request, controller.signal);
+        const request = browser ? buildSearchRequest(document,query.trim()) : await resolveSearchRequest(document, query.trim(), controller.signal);
+        controller.signal.throwIfAborted();
+        const page = browser ? await loadBrowserPage(browser,controller.signal) : undefined;
+        const response = page ? {ok:true,status:200,url:page.url,headers:new Headers({'content-type':'text/html; charset=utf-8'}),text:async()=>page.html} : await fetchSearchResponse(request, controller.signal);
         if (!response.ok) throw new Error('网站返回 HTTP ' + response.status);
         if (Number(response.headers.get('content-length')) > MAX_RESPONSE_SIZE) throw new Error('搜索响应超过 5 MB。');
         const contentType = response.headers.get('content-type') ?? '';
@@ -176,8 +213,8 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument, getSaved
         signal?.removeEventListener('abort', cancel);
       }
     },
-    async getBook(bookId) { return cache.get(bookId) ?? (await getSavedBook?.(bookId)) ?? null; },
-    async getChapters() { return []; },
-    async getChapter() { return null; },
+    async getBook(bookId, signal) { return reader && !isFanqieSourceId(sourceId) ? reader.getBook(bookId,signal) : cache.get(bookId) ?? (await getSavedBook?.(bookId)) ?? (reader ? reader.getBook(bookId, signal) : null); },
+    async getChapters(bookId, signal) { return reader ? reader.getChapters(bookId, signal) : []; },
+    async getChapter(bookId, chapterId, signal) { return reader ? reader.getChapter(bookId, chapterId, signal) : null; },
   };
 }

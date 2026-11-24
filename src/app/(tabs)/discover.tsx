@@ -57,7 +57,7 @@ export default function DiscoverScreen() {
       <View style={styles.heading}><Text style={styles.eyebrow}>DISCOVER STORIES</Text><Text style={styles.title}>发现好书</Text></View>
       <View style={styles.search}><Text style={styles.icon}>⌕</Text><TextInput style={styles.input} value={query} onChangeText={text => { setQuery(text); setShowDetails(false); }} placeholder="搜索书名或作者" placeholderTextColor="#A4AAA3" accessibilityLabel="搜索书籍" autoCorrect={false} returnKeyType="search" onSubmitEditing={() => setAttempt(value => value + 1)} /></View>
       <Text style={styles.caption} accessibilityLiveRegion="polite">{query.trim() ? `${books.length - summary.demoBooks} 本在线结果 · ${loading ? `正在搜索 ${summary.settled}/${total}` : `${summary.matched} 个书源有结果 · ${summary.empty} 个未匹配 · ${summary.failed} 个失败 · ${summary.unsupported} 个规则未支持`}${summary.demoBooks ? ` · ${summary.demoBooks} 本离线示例` : ''}` : `${summary.demoBooks} 本离线示例`}</Text>
-      <Text style={styles.caption}>{query.trim() ? '正在使用已启用书源。在线结果目前支持查看搜索信息，目录与正文还在接入中。' : '输入书名或作者搜索已启用书源，以下为离线示例。'}</Text>
+      <Text style={styles.caption}>{query.trim() ? '正在使用已启用书源。番茄小说支持查看目录和阅读公开章节。' : '输入书名或作者搜索已启用书源，以下为离线示例。'}</Text>
       {!!query.trim() && onlineResults.length > 0 && <View style={styles.errorPanel}>
         <Pressable onPress={() => setShowDetails(value => !value)} accessibilityRole="button" accessibilityState={{ expanded: showDetails }}><Text style={styles.error}>查看各书源搜索情况{errors.length ? `（${errors.length} 个失败或未支持）` : ''} {showDetails ? '⌃' : '⌄'}</Text></Pressable>
         {showDetails && onlineResults.map(result => <Text key={result.source.info.id} style={styles.errorDetail}>{result.source.info.name}：{result.error ?? (result.books.length ? `找到 ${result.books.length} 本` : '已响应，未提取到匹配结果')}</Text>)}

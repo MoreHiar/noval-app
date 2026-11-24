@@ -1,5 +1,22 @@
 import type { RuleSourceDocument } from '../domain/books';
 
+export function isLegacyQidianSearch(document: RuleSourceDocument): boolean {
+  return document.bookSourceUrl === 'https://m.qidian.com' &&
+    document.searchUrl === '/so/{{key}}.html?pageNum={{page}}' &&
+    document.ruleSearch?.bookList === '//*[@class="y-list__item"]' &&
+    document.ruleSearch?.bookUrl === '{{@@a.0@href##chapter##book}}##\\/0\\/##.html';
+}
+
+// A fixed translation of this known form-discovery script, not a JavaScript interpreter.
+export function isYuyoukuFormSearch(document: RuleSourceDocument): boolean {
+  return document.bookSourceUrl === 'https://www.yuyouku.com/#xsw8093' &&
+    document.ruleSearch?.bookList === '.list-group-item[1:-2]' &&
+    document.ruleSearch?.bookUrl === 'div.1@a@href' &&
+    document.searchUrl?.replace(/\s+/g, '') === YUYOUKU_SEARCH.replace(/\s+/g, '');
+}
+
+const YUYOUKU_SEARCH = '@js:\nvar su=source.getKey()\nvar htmlUrl=java.get(su,{}).headers(\'Location\')\njava.log(`重定向：${htmlUrl[0]}`)\nvar posturl=htmlUrl[0]?htmlUrl[0]:(su.includes("#")?su.match(/([^\\#]+)\\#/)[1]:su)\nposturl = posturl.slice(-1)==\'/\'?posturl.slice(0,-1):posturl\ncookie.removeCookie(posturl)\njava.log(`请求：${posturl}`)\n\n\nvar html = java.ajax(posturl);\n\nsearch = org.jsoup.Jsoup.parse(html).select(\'form[role=form]\').attr(\'action\');\n\n\nposturl+search+"?keyword={{key}},"+JSON.stringify({\r\n  "method": "GET"\r\n})';
+
 export function isLegacySuduguSearch(url: URL): boolean {
   return ['www.sudugu.co', 'www.sudugu.cc'].includes(url.hostname) && url.pathname === '/modules/article/search.php';
 }
@@ -16,6 +33,16 @@ function hasLegacySuduguRules(document: RuleSourceDocument): boolean {
 
 export function searchRulesFor(document: RuleSourceDocument): Record<string, unknown> {
   const rules = document.ruleSearch ?? {};
+  if (isLegacyQidianSearch(document)) return {
+    // Accommodate both the older wrapper layout and today's server-rendered anchors.
+    bookList: '.y-list__item, a[data-bid][href*="/chapter/"]',
+    name: 'img@alt##在线阅读',
+    bookUrl: 'img@data-src##^.*?/qdbimg/349573/([0-9]+).*$##https://m.qidian.com/book/$1.html',
+    author: '[class*="searchBookAuthor"], .y-list__item > a > div > div > p@text',
+    intro: '[class*="searchBookDesc"], .y-list__item > a > div > p@text',
+    coverUrl: 'img@data-src',
+    kind: '[class*="tags"] p:nth-child(-n+2), .y-list__item > a > div > div > div > p:nth-child(-n+2)@text',
+  };
   if (!hasLegacySuduguRules(document)) return rules;
   return {
     ...rules,

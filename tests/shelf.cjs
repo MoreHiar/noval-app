@@ -15,7 +15,8 @@ const { javascriptDocument } = require('../src/sources/javascript.ts');
 const { definitionId } = require('../src/sources/legado.ts');
 const { createLegadoSearchAdapter } = require('../src/sources/legado-search.ts');
 const { bookKey, deleteDefinition, deleteRuleSources, getShelfBooks, mergeSources, parseLibraryData, saveDefinition, setAllRuleSourcesEnabled, setShelfBook } = require('../src/sources/management.ts');
-const { createLibraryDatabase } = require('../src/storage/library-database.ts');
+const { createLibraryDatabase, SOURCE_RESET_ID } = require('../src/storage/library-database.ts');
+
 
 const initial = () => ({ version: 1, definitions: [fanqieSource(), { kind: 'javascript', enabled: true, document: javascriptDocument }], shelf: ['js-example/clock'] });
 const book = (overrides = {}) => ({ id: 'web-book', sourceId: fanqieSourceId, title: '测试小说', author: '作者', summary: '简介', category: '小说', status: '状态未知', accent: '#526C63', coverUrl: 'https://example.com/cover.jpg', ...overrides });
@@ -173,7 +174,122 @@ test('search memory retains at most 100 books and evicted collections still reso
   await store.save(data);
   responseBooks = Array.from({ length: 100 }, (_, index) => ({ title: `新小说${index}`, book_id: String(20000 + index), genre: '0' }));
   await adapter.search('第二批');
-  assert.equal(await adapter.getBook(results[1].id), null);
+  // An evicted online book can now be fetched from its public detail page.
+  t.mock.method(globalThis, 'fetch', async () => new Response(`<script>window.__INITIAL_STATE__=${JSON.stringify({ page: { bookId: '10001', bookName: '重新获取的小说', chapterTotal: 0 } })};</script>`));
+  assert.equal((await adapter.getBook(results[1].id)).title, '重新获取的小说');
   assert.deepEqual(await adapter.getBook(results[0].id), results[0]);
   assert.equal(data.shelf.length, 2);
+});
+
+test('reading position survives a cold database open, rejects stale writes, and is deleted with a collection', async t => {
+  const { store, db, raw } = await database(t);
+  let data = setShelfBook(await store.load(initial(), noLegacy), book(), true);
+  await store.save(data);
+  const position = { sourceId: fanqieSourceId, bookId: book().id, chapterId: '2', chapterTitle: '第二章', offset: 500, updatedAt: 200 };
+  await store.saveProgress(position);
+  await store.saveProgress({ ...position, chapterId: '1', offset: 0, updatedAt: 100 });
+  const cold = await createLibraryDatabase(db);
+  assert.deepEqual({ ...await cold.getProgress(position.sourceId, position.bookId) }, position);
+  assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 4);
+  await assert.rejects(store.saveProgress({ ...position, offset: -1 }), /进度格式无效/);
+  data = setShelfBook(data, book(), false);
+  await store.save(data);
+  assert.equal(await store.getProgress(position.sourceId, position.bookId), null);
+});
+
+test('progress keeps only 200 recent books and removing a source cleans its history', async t => {
+  const { store, raw } = await database(t);
+  const extra = { kind: 'legado', enabled: true, document: { bookSourceName: '临时', bookSourceUrl: 'https://progress.example' } };
+  const data = { ...initial(), definitions: [...initial().definitions, extra] };
+  const collected = setShelfBook(data, book({ sourceId: definitionId(extra), id: 'collected' }), true);
+  await store.load(collected, noLegacy);
+  await store.saveProgress({ sourceId: definitionId(extra), bookId: 'collected', chapterId: '9', chapterTitle: '第九章', offset: 0, updatedAt: 0 });
+  for (let index = 0; index < 205; index++) await store.saveProgress({ sourceId: definitionId(extra), bookId: String(index), chapterId: '1', chapterTitle: '第一章', offset: 0, updatedAt: index });
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM reading_progress').get().count, 201);
+  assert.equal((await store.getProgress(definitionId(extra), 'collected')).chapterId, '9');
+  assert.equal(await store.getProgress(definitionId(extra), '0'), null);
+  assert.equal((await store.getProgress(definitionId(extra), '204')).chapterId, '1');
+  await store.save(deleteDefinition(data, definitionId(extra)));
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM reading_progress').get().count, 0);
+  await assert.rejects(store.saveProgress({ sourceId: definitionId(extra), bookId: '204', chapterId: '2', chapterTitle: '第二章', offset: 0, updatedAt: 300 }), /书源已被删除/);
+});
+
+test('schema version 1 upgrades without altering existing shelf rows', async t => {
+  const { store, db, raw } = await database(t);
+  await store.load(initial(), noLegacy);
+  raw.exec('DROP TABLE reading_progress; PRAGMA user_version = 1;');
+  const upgraded = await createLibraryDatabase(db);
+  assert.deepEqual((await upgraded.load(initial(), forbiddenLegacy)).shelf, initial().shelf);
+  assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 4);
+  raw.exec('PRAGMA user_version = 999;');
+  await assert.rejects(createLibraryDatabase(db), /更新版本/);
+  assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 999);
+});
+
+
+test('requested source reset snapshots data and progress once, then preserves new imports', async t => {
+  const { store, db, raw } = await database(t);
+  const old = setShelfBook(initial(), book(), true);
+  await store.save(old);
+  const progress = { sourceId: fanqieSourceId, bookId: book().id, chapterId: '2', chapterTitle: '第二章', offset: 150, updatedAt: 100 };
+  await store.saveProgress(progress);
+  raw.exec('PRAGMA user_version = 3;');
+  const upgraded = await createLibraryDatabase(db, { resetSources: true });
+  const cleared = await upgraded.load(initial(), forbiddenLegacy);
+  assert.deepEqual(cleared, { version: 1, definitions: [], shelf: [], shelfBooks: [] });
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM shelf_books').get().count, 0);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM reading_progress').get().count, 0);
+  const backup = JSON.parse(raw.prepare('SELECT payload FROM library_backups WHERE id = ?').get(SOURCE_RESET_ID).payload);
+  assert.deepEqual(backup.library.definitions, old.definitions);
+  assert.deepEqual(backup.library.shelf, old.shelf);
+  assert.deepEqual(getShelfBooks(backup.library), getShelfBooks(old));
+  assert.equal(backup.progress[0].offset, 150);
+  const imported = mergeSources(cleared, [fanqieSource(false)], false).data;
+  await upgraded.save(imported);
+  const cold = await (await createLibraryDatabase(db, { resetSources: true })).load(initial(), forbiddenLegacy);
+  assert.deepEqual(cold, imported);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM library_backups').get().count, 1);
+});
+
+test('source reset failure rolls back backup, sources, shelf and progress and can retry', async t => {
+  const { store, db, raw, fail } = await database(t);
+  const old = setShelfBook(initial(), book(), true);
+  await store.save(old);
+  await store.saveProgress({ sourceId: fanqieSourceId, bookId: book().id, chapterId: '1', chapterTitle: '首章', offset: 10, updatedAt: 100 });
+  const resetting = await createLibraryDatabase(db, { resetSources: true });
+  fail(/DELETE FROM shelf_books/);
+  await assert.rejects(resetting.load(initial(), forbiddenLegacy), /disk write failure/);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM library_backups').get().count, 0);
+  assert.equal(JSON.parse(raw.prepare('SELECT definitions FROM library_settings').get().definitions).length, 2);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM shelf_books').get().count, 2);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM reading_progress').get().count, 1);
+  fail(undefined);
+  assert.deepEqual((await resetting.load(initial(), forbiddenLegacy)).definitions, []);
+});
+
+test('fresh and legacy installs remain empty after reset without importing old defaults again', async t => {
+  for (const legacy of [null, JSON.stringify(initial())]) {
+    const { db, raw } = await database(t);
+    const store = await createLibraryDatabase(db, { resetSources: true });
+    const empty = { version: 1, definitions: [], shelf: [] };
+    assert.deepEqual((await store.load(empty, async () => legacy)).definitions, []);
+    assert.deepEqual((await store.load(empty, forbiddenLegacy)).definitions, []);
+    assert.equal(raw.prepare('SELECT count(*) AS count FROM library_backups').get().count, 1);
+  }
+});
+
+test('four newly selected defaults install once, preserve same-address edits and do not return after deletion',async t=>{
+  const {selectedDefaultBundle}=require('../src/sources/defaults.ts');
+  assert.deepEqual(selectedDefaultBundle.sources.map(x=>x.document.bookSourceName),['哔哩轻小说','起点男频','笔趣庭','笔趣阁94']);
+  const {db,store,raw}=await database(t);
+  const custom={...selectedDefaultBundle.sources[1],enabled:false,document:{...selectedDefaultBundle.sources[1].document,enabled:false,bookSourceName:'我的起点'}};
+  await store.save({...initial(),definitions:[...initial().definitions,custom]});
+  const updated=await createLibraryDatabase(db,{defaultBundle:selectedDefaultBundle});
+  let current=await updated.load(initial(),forbiddenLegacy);
+  assert.equal(current.definitions.length,6);
+  assert.deepEqual(current.definitions.find(x=>definitionId(x)===definitionId(custom)),custom);
+  assert.deepEqual(current.shelf,initial().shelf);
+  current=deleteDefinition(current,definitionId(selectedDefaultBundle.sources[0]));await updated.save(current);
+  assert.deepEqual(await(await createLibraryDatabase(db,{defaultBundle:selectedDefaultBundle})).load(initial(),forbiddenLegacy),current);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count,1);
 });
