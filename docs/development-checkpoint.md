@@ -62,7 +62,7 @@
 | `src/app/(tabs)/sources.tsx` | 书源管理列表 |
 | `src/app/source/import.tsx` | 网络／本地导入与预览 |
 | `src/components/SourceEditor.tsx` | 基础字段及其他完整规则 JSON 编辑 |
-| `src/sources/builtin.ts`、`javascript.ts`、`static.ts` | 离线示例与静态适配器，非网站抓取引擎 |
+| `src/sources/fanqie.ts`、`javascript.ts`、`static.ts` | 番茄默认搜索源、可信 JavaScript 离线示例与静态适配器 |
 
 ## 新电脑启动
 

@@ -17,6 +17,7 @@ export type Book = {
   status: '连载中' | '已完结' | '状态未知';
   accent: string;
   coverUrl?: string;
+  coverFallbackUrl?: string;
 };
 
 export type ChapterMeta = {

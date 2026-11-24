@@ -49,7 +49,7 @@ export function buildSearchRequest(document: RuleSourceDocument, keyword: string
   }
   if (options.charset && !/^utf-?8$/i.test(options.charset)) throw new UnsupportedSearchRule('此书源使用 ' + options.charset + ' 编码，尚未接入。');
   const interpolate = (template: string) => {
-    const value = template.replace(/\{\{\s*key\s*\}\}/g, encodeURIComponent(keyword)).replace(/\{\{\s*page\s*\}\}/g, '1').replace(/\{\{\s*baseUrl\s*\}\}/g, document.bookSourceUrl.trim());
+    const value = template.replace(/\{\{\s*key\s*\}\}/g, encodeURIComponent(keyword)).replace(/\{\{\s*page\s*\}\}/g, '1').replace(/\{\{\s*\(\s*page\s*-\s*1\s*\)\s*\*\s*10\s*\}\}/g, '0').replace(/\{\{\s*baseUrl\s*\}\}/g, document.bookSourceUrl.trim());
     if (/\{\{|@js:|<js>/i.test(value)) throw new UnsupportedSearchRule('此书源的搜索模板需要脚本支持。');
     return value;
   };
@@ -83,7 +83,7 @@ function compileSearch(document: RuleSourceDocument) {
     try { return compileFieldRule(expression); }
     catch { return () => ''; }
   };
-  return { list, name, bookUrl, coverUrl: optional(rules.coverUrl), author: optional(rules.author), intro: optional(rules.intro), kind: optional(rules.kind) };
+  return { list, name, bookUrl, coverUrl: optional(rules.coverUrl), coverFallbackUrl: optional(rules.coverFallbackUrl), author: optional(rules.author), intro: optional(rules.intro), kind: optional(rules.kind) };
 }
 
 function aborted(): Error {
@@ -139,6 +139,12 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument): SourceA
             catch { /* Invalid optional artwork must not discard a book. */ }
           }
           coverUrl ??= knownSearchCover(document, url);
+          let coverFallbackUrl: string | undefined;
+          const fallback = compiled.coverFallbackUrl(item);
+          if (fallback && fallback !== cover) {
+            try { coverFallbackUrl = httpUrl(fallback, response.url || request.url); }
+            catch { /* Invalid optional artwork must not discard a book. */ }
+          }
           // Hex URLs contain no slash or percent escape, so Router can safely round-trip IDs.
           const id = 'web-' + Array.from(url).map(char => char.charCodeAt(0).toString(16).padStart(4, '0')).join('');
           const book: Book = {
@@ -146,6 +152,7 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument): SourceA
             summary: compiled.intro(item), category: compiled.kind(item) || '网络书源',
             status: '状态未知', accent: '#526C63',
             ...(coverUrl ? { coverUrl } : {}),
+            ...(coverFallbackUrl ? { coverFallbackUrl } : {}),
           };
           results.set(id, book);
           cache.delete(id);

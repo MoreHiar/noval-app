@@ -69,7 +69,9 @@ const jsonText = (value: unknown) => value === null || value === undefined ? '' 
 export function compileListRule(expression: unknown): (html: string) => SearchNode[] {
   if (typeof expression !== 'string') throw new UnsupportedSearchRule('缺少搜索列表规则 bookList。');
   if (expression.trim().startsWith('$')) {
-    const path = jsonPath(expression.trim());
+    const filter = expression.trim().match(/^(\$[^?]*?)\[\?\(@\.([\w-]+)\s*==\s*(['"])(.*?)\3\)\]$/);
+    const path = jsonPath(filter ? filter[1] : expression.trim());
+    if (!filter && expression.includes('[?')) throw new UnsupportedSearchRule('暂不支持此 JSONPath 过滤表达式：' + expression);
     return body => {
       let data: unknown;
       try { data = JSON.parse(body); }
@@ -78,8 +80,10 @@ export function compileListRule(expression: unknown): (html: string) => SearchNo
         throw new Error('书源接口返回错误（' + String(data.code).slice(0,20) + '），请稍后重试。');
       }
       const values = path(data);
-      if (!expression.includes('[*]') && (!values.length || values.every(value => value === null))) throw new Error('书源响应中缺少搜索列表，请检查规则是否失效。');
-      return values.flatMap(value => Array.isArray(value) ? value : [value]).map(value => ({ format: 'json', value }));
+      if (!values.length || values.every(value => value === null)) throw new Error('书源响应中缺少搜索列表，请检查规则是否失效。');
+      const items = values.flatMap(value => Array.isArray(value) ? value : [value]);
+      return (filter ? items.filter(value => value !== null && typeof value === 'object' && String((value as Record<string, unknown>)[filter[2]]) === filter[4]) : items)
+        .map(value => ({ format: 'json', value }));
     };
   }
   const steps = stages(expression);

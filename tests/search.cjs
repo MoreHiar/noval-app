@@ -11,6 +11,7 @@ require.extensions['.ts'] = (module, filename) => {
 };
 
 const { buildSearchRequest, createLegadoSearchAdapter } = require('../src/sources/legado-search.ts');
+const { fanqieDocument } = require('../src/sources/fanqie.ts');
 const { searchSources, summarizeSearch } = require('../src/sources/search.ts');
 
 const document = {
@@ -93,6 +94,29 @@ test('JSON API results support JSONPath lists, numeric IDs, metadata and book UR
   assert.equal(books[0].summary, '简介');
   assert.equal(books[0].coverUrl, 'https://covers.example/book.jpg');
   assert.equal(books[0].id.slice(4).match(/.{4}/g).map(hex => String.fromCharCode(parseInt(hex, 16))).join(''), 'https://appi.kuwo.cn/novels/api/book/123');
+});
+
+test('built-in Fanqie rule searches novel results and preserves the cover and detail URL', async t => {
+  const request = buildSearchRequest(fanqieDocument, '斗罗');
+  assert.equal(new URL(request.url).searchParams.get('offset'), '0');
+  assert.equal(new URL(request.url).searchParams.get('q'), '斗罗');
+  t.mock.method(global, 'fetch', async url => {
+    assert.equal(url, request.url);
+    return Response.json({ code: 0, data: { ret_data: [
+      { genre: '0', title: '斗罗小说', author: '作者', abstract: '简介', thumb_url: 'https://example.com/cover.jpg', audio_thumb_uri: 'https://example.com/fallback.jpg', book_id: '7366848355118353447' },
+      { genre: '1', title: '非小说', book_id: '2' },
+    ] } });
+  });
+  const adapter = createLegadoSearchAdapter(fanqieDocument);
+  assert.equal(adapter.searchUnavailableReason, undefined);
+  const books = await adapter.search('斗罗');
+  assert.equal(books.length, 1);
+  assert.equal(books[0].title, '斗罗小说');
+  assert.equal(books[0].coverUrl, 'https://example.com/cover.jpg');
+  assert.equal(books[0].coverFallbackUrl, 'https://example.com/fallback.jpg');
+  assert.equal(books[0].id.slice(4).match(/.{4}/g).map(hex => String.fromCharCode(parseInt(hex, 16))).join(''), 'https://fanqienovel.com/page/7366848355118353447');
+  fetch.mock.mockImplementation(async () => Response.json({ code: 0, data: { ret_data: [{ genre: '1', title: '非小说', book_id: '2' }] } }));
+  assert.deepEqual(await adapter.search('斗罗'), []);
 });
 
 test('online completion counts exclude both offline adapters and distinguish unsupported rules from failures', () => {

@@ -12,6 +12,7 @@ const sourceHosts = new Set([
   'www.shoujix.com', 'www.23qb.com', 'm.laikan9.com', 'www.wcxsw.org', 'www.siluke.com',
   'www.ddxs.com', 'hetushu.com', 'm.aitbooks.com', 'm.suixkan.com', 'www.92xs.info',
   'www.81zw2.com', 'www.50zw.so',
+  'novel.snssdk.com',
 ]);
 const blockedV4 = new BlockList();
 const blockedV6 = new BlockList();

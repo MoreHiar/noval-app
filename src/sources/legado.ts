@@ -34,7 +34,7 @@ export function parseRuleSource(raw: unknown): RuleSourceDocument {
 
 export const sourceTypeName = (document: RuleSourceDocument) => ['文本', '音频', '图片', '文件'][document.bookSourceType ?? 0];
 
-// An illustrative template only. No bundled third-party sources or credentials.
+// Template used when creating a custom source.
 export const ruleSourceExample: RuleSourceDocument = {
   bookSourceName: '示例书源（请替换网站与规则）',
   bookSourceUrl: 'https://example.com',

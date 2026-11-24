@@ -8,7 +8,8 @@ require.extensions['.ts'] = (module, filename) => {
 };
 
 const { definitionId } = require('../src/sources/legado.ts');
-const { deleteRuleSources, exportSources, parseLibraryData, setAllRuleSourcesEnabled } = require('../src/sources/management.ts');
+const { fanqieSource, fanqieSourceId } = require('../src/sources/fanqie.ts');
+const { deleteDefinition, deleteRuleSources, exportSources, mergeSources, parseLibraryData, saveDefinition, setAllRuleSourcesEnabled } = require('../src/sources/management.ts');
 
 const demo = {
   kind: 'builtin', enabled: true,
@@ -26,11 +27,37 @@ test('enable and disable all website sources without changing offline examples o
     assert.deepEqual(result.definitions.slice(1).map(entry => [entry.enabled, entry.document.enabled]), [[enabled, enabled], [enabled, enabled]]);
     assert.deepEqual(result.shelf, original.shelf);
     const restored = parseLibraryData(JSON.stringify(result));
-    assert.deepEqual(restored.definitions.slice(1).map(entry => entry.enabled), [enabled, enabled]);
-    assert.deepEqual(JSON.parse(exportSources(restored.definitions.slice(1))).map(entry => entry.enabled), [enabled, enabled]);
+    assert.deepEqual(restored.definitions.filter(entry => entry.kind === 'legado').map(entry => entry.enabled), [true, enabled, enabled]);
+    assert.deepEqual(JSON.parse(exportSources(restored.definitions.filter(entry => entry.kind === 'legado'))).map(entry => entry.enabled), [true, enabled, enabled]);
   }
   assert.equal(original.definitions[1].document.enabled, true);
   assert.equal(original.definitions[2].document.enabled, false);
+});
+
+test('old library data gains the canonical default source and loses only the removed demo library', () => {
+  const restored = parseLibraryData(JSON.stringify(original));
+  assert.deepEqual(restored.definitions.map(definitionId), [fanqieSourceId, definitionId(a), definitionId(b)]);
+  assert.deepEqual(restored.shelf, [`${definitionId(a)}/book-1`, `${definitionId(b)}/book-2`]);
+  const disabled = { ...original, definitions: [demo, fanqieSource(false), a] };
+  const again = parseLibraryData(JSON.stringify(disabled));
+  assert.equal(again.definitions[0].enabled, false);
+  assert.deepEqual(again.definitions[0].document.ruleSearch, fanqieSource().document.ruleSearch);
+  assert.equal(parseLibraryData(JSON.stringify(again)).definitions.length, again.definitions.length);
+});
+
+test('default source cannot be deleted, edited or replaced on import, but can be disabled', () => {
+  const current = { version: 1, definitions: [fanqieSource(), a], shelf: [`${fanqieSourceId}/book`, `${definitionId(a)}/other`] };
+  assert.throws(() => deleteDefinition(current, fanqieSourceId), /不可删除/);
+  assert.throws(() => saveDefinition(current, fanqieSource().document, true, fanqieSourceId), /不可编辑/);
+  assert.throws(() => saveDefinition(current, fanqieSource().document, true), /不可编辑/);
+  const removed = deleteRuleSources(current, [fanqieSourceId, definitionId(a)]);
+  assert.deepEqual(removed.definitions.map(definitionId), [fanqieSourceId]);
+  assert.deepEqual(removed.shelf, [`${fanqieSourceId}/book`]);
+  const impostor = { ...fanqieSource(false), document: { ...fanqieSource().document, bookSourceName: '替换规则', searchUrl: 'https://invalid.example' } };
+  const merged = mergeSources(current, [impostor], true);
+  assert.equal(merged.skipped, 1);
+  assert.deepEqual(merged.data.definitions[0], current.definitions[0]);
+  assert.equal(setAllRuleSourcesEnabled(current, false).definitions[0].enabled, false);
 });
 
 test('bulk delete removes only selected website sources and their shelf references', () => {

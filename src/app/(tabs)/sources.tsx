@@ -7,6 +7,7 @@ import { TabBarIcon } from '../../components/TabBarIcon';
 import { theme } from '../../components/theme';
 import { RuleManagedSource } from '../../domain/books';
 import { exportSourceFile } from '../../sources/files';
+import { isFanqieSourceId } from '../../sources/fanqie';
 import { definitionId, isRuleSource, sourceTypeName } from '../../sources/legado';
 import { exportSources } from '../../sources/management';
 import { useLibrary } from '../../state/library';
@@ -17,6 +18,7 @@ type Filter = typeof filters[number]['key'];
 export default function SourcesScreen() {
   const { sourceDefinitions: allDefinitions, ready, storageError, retryLoad, setSourceEnabled, setAllSourcesEnabled, removeSource, removeSources, shelf } = useLibrary();
   const sourceDefinitions = useMemo(() => allDefinitions.filter(isRuleSource), [allDefinitions]);
+  const deletableCount = sourceDefinitions.filter(entry => !isFanqieSourceId(definitionId(entry))).length;
   const enabledCount = sourceDefinitions.filter(entry => entry.enabled).length;
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
@@ -34,9 +36,10 @@ export default function SourcesScreen() {
     const { bookSourceName: name, bookSourceUrl: id, bookSourceComment: description, bookSourceGroup: group } = entry.document;
     return matchesFilter && (!term || `${name} ${id} ${group ?? ''} ${description ?? ''}`.toLocaleLowerCase().includes(term));
   }), [sourceDefinitions, filter, query]);
-  const selected = sourceDefinitions.filter(entry => selectedIds.includes(definitionId(entry)));
+  const selected = sourceDefinitions.filter(entry => !isFanqieSourceId(definitionId(entry)) && selectedIds.includes(definitionId(entry)));
   const selectedSet = new Set(selected.map(definitionId));
-  const allVisibleSelected = visible.length > 0 && visible.every(entry => selectedSet.has(definitionId(entry)));
+  const selectableVisible = visible.filter(entry => !isFanqieSourceId(definitionId(entry)));
+  const allVisibleSelected = selectableVisible.length > 0 && selectableVisible.every(entry => selectedSet.has(definitionId(entry)));
   const deletingIds = confirmBulkDelete ? selected.map(definitionId) : deleting ? [definitionId(deleting)] : [];
   const deletingIdSet = new Set(deletingIds);
   const deletedShelfCount = shelf.filter(key => deletingIdSet.has(key.split('/')[0])).length;
@@ -71,8 +74,8 @@ export default function SourcesScreen() {
   });
   const toggleSelection = (id: string) => setSelectedIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
   const toggleVisibleSelection = () => setSelectedIds(current => allVisibleSelected
-    ? current.filter(id => !visible.some(entry => definitionId(entry) === id))
-    : [...new Set([...current, ...visible.map(definitionId)])]);
+    ? current.filter(id => !selectableVisible.some(entry => definitionId(entry) === id))
+    : [...new Set([...current, ...selectableVisible.map(definitionId)])]);
   const cancelSelection = () => { setSelecting(false); setSelectedIds([]); setConfirmBulkDelete(false); };
 
   return (
@@ -101,7 +104,7 @@ export default function SourcesScreen() {
             <View style={styles.bulkToolbar}>
               <SourceButton secondary onPress={() => setAllEnabled(true)} disabled={!ready || busy || selecting || enabledCount === sourceDefinitions.length}>全部启用</SourceButton>
               <SourceButton secondary onPress={() => setAllEnabled(false)} disabled={!ready || busy || selecting || enabledCount === 0}>全部禁用</SourceButton>
-              <SourceButton danger onPress={() => { setError(''); setMessage(''); setSelecting(true); }} disabled={!ready || busy || selecting || !sourceDefinitions.length}>批量删除</SourceButton>
+              <SourceButton danger onPress={() => { setError(''); setMessage(''); setSelecting(true); }} disabled={!ready || busy || selecting || !deletableCount}>批量删除</SourceButton>
             </View>
             <View style={styles.search}>
               <TabBarIcon name="search" color={theme.muted} size={18} />
@@ -113,7 +116,7 @@ export default function SourcesScreen() {
             </View>
             {selecting && <View style={styles.selectionBar}>
               <Text style={styles.selectionCount}>已选 {selected.length} 个</Text>
-              <SourceButton secondary onPress={toggleVisibleSelection} disabled={busy || !visible.length}>{allVisibleSelected ? '取消选中当前' : '选中当前可见'}</SourceButton>
+              <SourceButton secondary onPress={toggleVisibleSelection} disabled={busy || !selectableVisible.length}>{allVisibleSelected ? '取消选中当前' : '选中当前可见'}</SourceButton>
               <SourceButton secondary onPress={cancelSelection} disabled={busy}>取消</SourceButton>
               <SourceButton danger onPress={() => setConfirmBulkDelete(true)} disabled={busy || !selected.length}>删除所选</SourceButton>
             </View>}
@@ -126,18 +129,22 @@ export default function SourcesScreen() {
         renderItem={({ item }) => (
           <View style={[styles.source, !item.enabled && styles.disabledSource]}>
             <View style={styles.sourceHeading}>
-              {selecting ? <Pressable onPress={() => toggleSelection(definitionId(item))} accessibilityRole="checkbox" accessibilityState={{ checked: selectedSet.has(definitionId(item)) }} accessibilityLabel={`选择${item.document.bookSourceName}`} style={[styles.checkbox, selectedSet.has(definitionId(item)) && styles.checkedBox]}><Text style={styles.checkmark}>{selectedSet.has(definitionId(item)) ? '✓' : ''}</Text></Pressable> : <View style={styles.sourceBadge}><TabBarIcon name="sources" color={item.enabled ? theme.accent : theme.muted} size={24} /></View>}
+              {selecting && !isFanqieSourceId(definitionId(item)) ? <Pressable onPress={() => toggleSelection(definitionId(item))} accessibilityRole="checkbox" accessibilityState={{ checked: selectedSet.has(definitionId(item)) }} accessibilityLabel={`选择${item.document.bookSourceName}`} style={[styles.checkbox, selectedSet.has(definitionId(item)) && styles.checkedBox]}><Text style={styles.checkmark}>{selectedSet.has(definitionId(item)) ? '✓' : ''}</Text></Pressable> : <View style={styles.sourceBadge}><TabBarIcon name="sources" color={item.enabled ? theme.accent : theme.muted} size={24} /></View>}
               <View style={styles.sourceInfo}><Text style={styles.sourceName}>{item.document.bookSourceName}</Text><Text style={styles.sourceId} selectable>{item.document.bookSourceUrl}</Text></View>
               {!selecting && <Switch value={item.enabled} onValueChange={enabled => perform(() => setSourceEnabled(definitionId(item), enabled))} disabled={busy || !ready} accessibilityLabel={`启用${item.document.bookSourceName}`} thumbColor={theme.paper} trackColor={{ true: theme.accent }} />}
             </View>
             {item.document.bookSourceComment ? <Text style={styles.description} numberOfLines={2}>{item.document.bookSourceComment}</Text> : null}
-            <View style={styles.metadata}><Text style={styles.kind}>{sourceTypeName(item.document)}书源</Text><Text style={styles.metaText}>{item.document.bookSourceGroup || '未分组'}</Text><Text style={styles.metaText}>{item.document.enabledExplore ? '含发现规则' : '无发现入口'}</Text><Text style={[styles.status, !item.enabled && styles.inactiveStatus]}>{item.enabled ? '已启用' : '已停用'}</Text></View>
-            {selecting ? <Pressable style={styles.selectRow} onPress={() => toggleSelection(definitionId(item))} accessibilityRole="checkbox" accessibilityState={{ checked: selectedSet.has(definitionId(item)) }} accessibilityLabel={`${selectedSet.has(definitionId(item)) ? '取消选择' : '选择'}${item.document.bookSourceName}`}><Text style={styles.rowButtonText}>{selectedSet.has(definitionId(item)) ? '已选择' : '选择此书源'}</Text></Pressable> : <View style={styles.sourceActions}>
+            <View style={styles.metadata}><Text style={styles.kind}>{sourceTypeName(item.document)}书源</Text><Text style={styles.metaText}>{isFanqieSourceId(definitionId(item)) ? '内置 · 不可删除' : item.document.bookSourceGroup || '未分组'}</Text><Text style={styles.metaText}>{item.document.enabledExplore ? '含发现规则' : '无发现入口'}</Text><Text style={[styles.status, !item.enabled && styles.inactiveStatus]}>{item.enabled ? '已启用' : '已停用'}</Text></View>
+            {selecting ? isFanqieSourceId(definitionId(item)) ? <View style={styles.selectRow}><Text style={styles.rowButtonText}>内置书源不可删除</Text></View> : <Pressable style={styles.selectRow} onPress={() => toggleSelection(definitionId(item))} accessibilityRole="checkbox" accessibilityState={{ checked: selectedSet.has(definitionId(item)) }} accessibilityLabel={`${selectedSet.has(definitionId(item)) ? '取消选择' : '选择'}${item.document.bookSourceName}`}><Text style={styles.rowButtonText}>{selectedSet.has(definitionId(item)) ? '已选择' : '选择此书源'}</Text></Pressable> : <View style={styles.sourceActions}>
+              {!isFanqieSourceId(definitionId(item)) && <>
               <Pressable style={styles.rowButton} onPress={() => { setMessage(''); setError(''); router.push({ pathname: '/source/edit', params: { id: definitionId(item) } }); }} disabled={busy} accessibilityRole="button" accessibilityLabel={`编辑${item.document.bookSourceName}`}><Text style={styles.rowButtonText}>编辑</Text></Pressable>
               <View style={styles.actionDivider} />
+              </>}
               <Pressable style={styles.rowButton} onPress={() => exportItems([item], true)} disabled={busy} accessibilityRole="button" accessibilityLabel={`导出${item.document.bookSourceName}`}><Text style={styles.rowButtonText}>导出</Text></Pressable>
+              {!isFanqieSourceId(definitionId(item)) && <>
               <View style={styles.actionDivider} />
               <Pressable style={styles.rowButton} onPress={() => { setError(''); setDeleting(item); }} disabled={busy} accessibilityRole="button" accessibilityLabel={`删除${item.document.bookSourceName}`}><Text style={styles.deleteText}>删除</Text></Pressable>
+              </>}
             </View>}
           </View>
         )}

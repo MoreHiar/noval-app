@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Book, ManagedSource, SourceAdapter, RuleSourceDocument } from '../domain/books';
-import { builtinDocument } from '../sources/builtin';
+import { fanqieSource } from '../sources/fanqie';
 import { javascriptDocument, javascriptExampleSource } from '../sources/javascript';
 import { deleteDefinition, deleteRuleSources, LibraryData, mergeSources, parseLibraryData, parseSourceImport, saveDefinition, setAllRuleSourcesEnabled } from '../sources/management';
 import { createStaticAdapter } from '../sources/static';
@@ -32,11 +32,10 @@ const STORAGE_KEY = 'noval.library.v1';
 const initialData: LibraryData = {
   version: 1,
   definitions: [
-    { document: builtinDocument, enabled: true, kind: 'builtin' },
+    fanqieSource(),
     { document: javascriptDocument, enabled: true, kind: 'javascript' },
   ],
-  shelf: ['sample-library/starlight', 'sample-library/rain', 'sample-library/mountain', 'sample-library/moon',
-    'sample-library/summer', 'sample-library/garden', 'sample-library/north', 'js-example/clock'],
+  shelf: ['js-example/clock'],
 };
 const LibraryContext = createContext<LibraryState | null>(null);
 const bookKey = (book: Book) => `${book.sourceId}/${book.id}`;

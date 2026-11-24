@@ -3,15 +3,16 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import type { Book } from '../domain/books';
 
 export function BookCover({ book, large = false }: { book: Book; large?: boolean }) {
-  // Track the failed URL so recycled list cells can load a different book's cover.
-  const [failedUrl, setFailedUrl] = useState<string>();
-  const uri = book.coverUrl;
-  const showImage = !!uri && uri !== failedUrl;
+  const [failed, setFailed] = useState<{ key: string; urls: string[] }>({ key: '', urls: [] });
+  const key = `${book.sourceId}/${book.id}`;
+  const failedUrls = failed.key === key ? failed.urls : [];
+  const uri = [book.coverUrl, book.coverFallbackUrl].find(url => url && !failedUrls.includes(url));
+  const showImage = !!uri;
 
   return (
     <View style={[styles.cover, large && styles.large, { backgroundColor: book.accent }]}>
       {showImage ? (
-        <Image key={uri} source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`${book.title}封面`} onError={() => setFailedUrl(uri)} />
+        <Image key={uri} source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`${book.title}封面`} onError={() => setFailed(current => ({ key, urls: [...(current.key === key ? current.urls : []), uri] }))} />
       ) : (
         <>
           <View style={styles.rule} />
