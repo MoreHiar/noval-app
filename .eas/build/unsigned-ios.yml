@@ -1,0 +1,19 @@
+build:
+  name: Unsigned iPhone IPA for personal re-signing
+  steps:
+    - eas/checkout
+    - eas/install_node_modules
+    - eas/resolve_build_config
+    - eas/prebuild
+    - run:
+        name: Install CocoaPods dependencies
+        working_directory: ios
+        command: pod install
+    - run:
+        name: Build and package unsigned iPhone application
+        command: bash scripts/build-unsigned-ios.sh
+    - eas/upload_artifact:
+        name: Upload unsigned IPA (requires re-signing before installation)
+        inputs:
+          type: application-archive
+          path: dist/ios-unsigned/Noval-unsigned.ipa

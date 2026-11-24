@@ -24,3 +24,5 @@ npx expo start
 Web 浏览器源需要 Node 服务和 Playwright 浏览器。开发机优先使用已安装的 Chrome；也可运行 `npx playwright install chromium`。部署时同样需提供浏览器，不能只上传静态文件。Android／iOS 使用 SDK 58 的 `react-native-webview`，Expo Go 已包含该模块。
 
 检查：`npx expo lint`、`npx tsc --noEmit`、`npm run test:search`、`npm run test:sources`、`npm run test:shelf`、`npm run test:reading`。
+
+没有付费 Apple 开发者账号时，可使用 `unsigned-ios` 云构建配置生成供个人重新签名的 iPhone IPA；安装前仍需签名，详见 [iOS 打包说明](docs/ios-packaging.md)。

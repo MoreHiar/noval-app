@@ -11,6 +11,12 @@
     "preview": {
       "distribution": "internal"
     },
+    "unsigned-ios": {
+      "ios": {
+        "withoutCredentials": true,
+        "config": "unsigned-ios.yml"
+      }
+    },
     "production": {
       "autoIncrement": true
     }

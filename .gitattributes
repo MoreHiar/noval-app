@@ -1,0 +1,2 @@
+# Keep macOS build scripts executable by Bash after a Windows checkout.
+*.sh text eol=lf
