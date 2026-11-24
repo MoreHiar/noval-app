@@ -1,9 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Book, ManagedSource, SourceAdapter, RuleSourceDocument } from '../domain/books';
 import { fanqieSource } from '../sources/fanqie';
 import { javascriptDocument, javascriptExampleSource } from '../sources/javascript';
-import { deleteDefinition, deleteRuleSources, LibraryData, mergeSources, parseLibraryData, parseSourceImport, saveDefinition, setAllRuleSourcesEnabled } from '../sources/management';
+import { bookKey, deleteDefinition, deleteRuleSources, getShelfBooks, LibraryData, mergeSources, parseSourceImport, saveDefinition, setAllRuleSourcesEnabled, setShelfBook } from '../sources/management';
+import { loadLibrary, loadShelfBook, saveLibrary } from '../storage/library';
 import { createStaticAdapter } from '../sources/static';
 import { createLegadoSearchAdapter } from '../sources/legado-search';
 import { definitionId, isRuleSource } from '../sources/legado';
@@ -14,6 +14,7 @@ type LibraryState = {
   enabledSources: SourceAdapter[];
   sourceDefinitions: ManagedSource[];
   shelf: string[];
+  shelfBooks: Book[];
   ready: boolean;
   storageError: string;
   retryLoad(): void;
@@ -23,12 +24,11 @@ type LibraryState = {
   removeSources(ids: string[]): Promise<void>;
   setSourceEnabled(id: string, enabled: boolean): Promise<void>;
   setAllSourcesEnabled(enabled: boolean): Promise<void>;
-  toggleShelf(book: Book): Promise<void>;
+  setBookOnShelf(book: Book, present: boolean): Promise<void>;
   isOnShelf(book: Book): boolean;
   getSource(id: string): SourceAdapter | undefined;
 };
 
-const STORAGE_KEY = 'noval.library.v1';
 const initialData: LibraryData = {
   version: 1,
   definitions: [
@@ -38,7 +38,6 @@ const initialData: LibraryData = {
   shelf: ['js-example/clock'],
 };
 const LibraryContext = createContext<LibraryState | null>(null);
-const bookKey = (book: Book) => `${book.sourceId}/${book.id}`;
 
 export function LibraryProvider({ children }: PropsWithChildren) {
   const [data, setData] = useState(initialData);
@@ -51,8 +50,7 @@ export function LibraryProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
-    AsyncStorage.getItem(STORAGE_KEY).then(stored => {
-      const restored = stored === null ? initialData : parseLibraryData(stored);
+    loadLibrary(initialData).then(restored => {
       if (!active) return;
       dataRef.current = restored;
       setData(restored);
@@ -60,7 +58,7 @@ export function LibraryProvider({ children }: PropsWithChildren) {
       setReady(true);
       setStorageError('');
     }).catch(() => {
-      if (active) setStorageError('无法读取本地书源，请重试。原有数据未被覆盖。');
+      if (active) setStorageError('无法读取本地书源与书架，请重试。原有数据未被覆盖。');
     });
     return () => { active = false; };
   }, [loadAttempt]);
@@ -70,7 +68,7 @@ export function LibraryProvider({ children }: PropsWithChildren) {
     const operation = queue.current.then(async () => {
       if (!readyRef.current) throw new Error('书源尚未加载完成，请稍后重试。');
       const next = mutate(dataRef.current);
-      try { await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next.data)); }
+      try { await saveLibrary(next.data); }
       catch { throw new Error('保存失败，请检查设备存储空间后重试。'); }
       dataRef.current = next.data;
       setData(next.data);
@@ -81,7 +79,8 @@ export function LibraryProvider({ children }: PropsWithChildren) {
   }, []);
 
   const sources = useMemo(() => data.definitions.map(entry => {
-    if (isRuleSource(entry)) return createLegadoSearchAdapter(entry.document);
+    if (isRuleSource(entry)) return createLegadoSearchAdapter(entry.document,
+      bookId => loadShelfBook(definitionId(entry), bookId));
     const { document, kind } = entry;
     if (kind === 'javascript' && document.id === javascriptDocument.id) {
       return { ...javascriptExampleSource, info: { ...javascriptExampleSource.info, name: document.name, description: document.description ?? '' } };
@@ -89,9 +88,10 @@ export function LibraryProvider({ children }: PropsWithChildren) {
     return createStaticAdapter(document, kind);
   }), [data.definitions]);
   const enabledSources = useMemo(() => sources.filter(source => data.definitions.some(entry => definitionId(entry) === source.info.id && entry.enabled)), [sources, data.definitions]);
+  const shelfBooks = useMemo(() => getShelfBooks(data), [data]);
 
   const value: LibraryState = {
-    sources, enabledSources, sourceDefinitions: data.definitions, shelf: data.shelf, ready, storageError,
+    sources, enabledSources, sourceDefinitions: data.definitions, shelf: data.shelf, shelfBooks, ready, storageError,
     retryLoad: () => setLoadAttempt(attempt => attempt + 1),
     saveSource: (document, enabled, existingId) => update(current => ({ data: saveDefinition(current, document, enabled, existingId), result: undefined })),
     importSources(input, replace) {
@@ -107,11 +107,7 @@ export function LibraryProvider({ children }: PropsWithChildren) {
       data: { ...current, definitions: current.definitions.map(entry => definitionId(entry) === id ? (isRuleSource(entry) ? { ...entry, enabled, document: { ...entry.document, enabled } } : { ...entry, enabled }) : entry) }, result: undefined,
     })),
     setAllSourcesEnabled: enabled => update(current => ({ data: setAllRuleSourcesEnabled(current, enabled), result: undefined })),
-    toggleShelf: book => update(current => {
-      if (!current.definitions.some(entry => definitionId(entry) === book.sourceId && (isRuleSource(entry) || entry.document.books.some(item => item.id === book.id)))) throw new Error('书籍所属书源已被删除或修改。');
-      const key = bookKey(book);
-      return { data: { ...current, shelf: current.shelf.includes(key) ? current.shelf.filter(item => item !== key) : [...current.shelf, key] }, result: undefined };
-    }),
+    setBookOnShelf: (book, present) => update(current => ({ data: setShelfBook(current, book, present), result: undefined })),
     isOnShelf: book => data.shelf.includes(bookKey(book)),
     getSource: id => sources.find(source => source.info.id === id),
   };

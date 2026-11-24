@@ -7,6 +7,7 @@ import { isLegacySuduguSearch, knownSearchCover, searchRulesFor } from './search
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
 const TIMEOUT_MS = 20000;
+const MAX_CACHED_BOOKS = 100;
 type RequestOptions = { method?: string; body?: string; charset?: string; headers?: unknown };
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -92,7 +93,7 @@ function aborted(): Error {
   return error;
 }
 
-export function createLegadoSearchAdapter(document: RuleSourceDocument): SourceAdapter {
+export function createLegadoSearchAdapter(document: RuleSourceDocument, getSavedBook?: (bookId: string) => Promise<Book | null>): SourceAdapter {
   const sourceId = ruleSourceId(document);
   const cache = new Map<string, Book>();
   let compiled: ReturnType<typeof compileSearch> | undefined;
@@ -126,7 +127,7 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument): SourceA
         if (!items.length && /"(?:challenge_url|error)"\s*:\s*"(?:[^"\n]*challenge[^"\n]*|\/__gatekeeper[^"\n]*)"|<title>\s*(?:Just a moment|Attention Required)/i.test(html)) throw new Error('网站要求防护验证，当前直接搜索无法通过。');
         const results = new Map<string, Book>();
         for (const item of items.slice(0, 100)) {
-          const title = compiled.name(item);
+          const title = compiled.name(item).slice(0, 512);
           const link = compiled.bookUrl(item);
           if (!title || !link) continue;
           let url: string;
@@ -148,8 +149,8 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument): SourceA
           // Hex URLs contain no slash or percent escape, so Router can safely round-trip IDs.
           const id = 'web-' + Array.from(url).map(char => char.charCodeAt(0).toString(16).padStart(4, '0')).join('');
           const book: Book = {
-            id, sourceId, title, author: compiled.author(item) || '未知作者',
-            summary: compiled.intro(item), category: compiled.kind(item) || '网络书源',
+            id, sourceId, title, author: compiled.author(item).slice(0, 256) || '未知作者',
+            summary: compiled.intro(item).slice(0, 4000), category: compiled.kind(item).slice(0, 128) || '网络书源',
             status: '状态未知', accent: '#526C63',
             ...(coverUrl ? { coverUrl } : {}),
             ...(coverFallbackUrl ? { coverFallbackUrl } : {}),
@@ -159,7 +160,7 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument): SourceA
           cache.set(id, book);
         }
         if (items.length && !results.size) throw new Error('找到了列表，但无法提取有效书名或链接，请检查书源规则是否已失效。');
-        while (cache.size > 500) cache.delete(cache.keys().next().value!);
+        while (cache.size > MAX_CACHED_BOOKS) cache.delete(cache.keys().next().value!);
         return [...results.values()];
       } catch (cause) {
         if (signal?.aborted) throw aborted();
@@ -175,7 +176,7 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument): SourceA
         signal?.removeEventListener('abort', cancel);
       }
     },
-    async getBook(bookId) { return cache.get(bookId) ?? null; },
+    async getBook(bookId) { return cache.get(bookId) ?? (await getSavedBook?.(bookId)) ?? null; },
     async getChapters() { return []; },
     async getChapter() { return null; },
   };

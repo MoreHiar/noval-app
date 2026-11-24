@@ -1,10 +1,59 @@
-import type { ManagedSource, RuleManagedSource, RuleSourceDocument, StaticManagedSource } from '../domain/books';
+import type { Book, ManagedSource, RuleManagedSource, RuleSourceDocument, StaticManagedSource } from '../domain/books';
 import { fanqieSource, isFanqieSourceId } from './fanqie';
 import { definitionId, isRuleSource, parseRuleSource, readSourceJson, ruleSourceId } from './legado';
 import { parseStaticSource } from './static';
 
-export type LibraryData = { version: 1; definitions: ManagedSource[]; shelf: string[] };
+export type LibraryData = { version: 1; definitions: ManagedSource[]; shelf: string[]; shelfBooks?: Book[] };
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export const bookKey = (book: Pick<Book, 'sourceId' | 'id'>) => `${book.sourceId}/${book.id}`;
+
+// Persist metadata for collected books only. Never retain arbitrary response fields or artwork bytes.
+function snapshotBook(value: unknown): Book {
+  if (!isRecord(value) || !['id', 'sourceId', 'title', 'author', 'summary', 'category', 'accent'].every(key => typeof value[key] === 'string') ||
+    !value.id || !value.sourceId || !value.title || !['连载中', '已完结', '状态未知'].includes(String(value.status)) ||
+    (value.coverUrl !== undefined && typeof value.coverUrl !== 'string') || (value.coverFallbackUrl !== undefined && typeof value.coverFallbackUrl !== 'string')) {
+    throw new Error('书架书籍信息格式无效。');
+  }
+  const book = value as Book;
+  const artwork = (url?: string) => url && url.length <= 4096 && /^https?:\/\//i.test(url) ? url : undefined;
+  return {
+    id: book.id, sourceId: book.sourceId, title: book.title.slice(0, 512), author: book.author.slice(0, 256),
+    summary: book.summary.slice(0, 4000), category: book.category.slice(0, 128), status: book.status, accent: book.accent.slice(0, 32),
+    ...(artwork(book.coverUrl) ? { coverUrl: artwork(book.coverUrl) } : {}),
+    ...(artwork(book.coverFallbackUrl) ? { coverFallbackUrl: artwork(book.coverFallbackUrl) } : {}),
+  };
+}
+
+function reconcileShelf(current: LibraryData): LibraryData {
+  const shelf = [...new Set(pruneShelf(current.shelf, current.definitions))];
+  const keys = new Set(shelf);
+  const books = new Map((current.shelfBooks ?? []).filter(book => keys.has(bookKey(book))).map(book => [bookKey(book), snapshotBook(book)]));
+  return { ...current, shelf, shelfBooks: [...books.values()] };
+}
+
+export function getShelfBooks(current: LibraryData): Book[] {
+  const books = new Map((current.shelfBooks ?? []).map(book => [bookKey(book), book]));
+  for (const entry of current.definitions) {
+    if (!isRuleSource(entry)) for (const book of entry.document.books) {
+      const item = { ...book, sourceId: entry.document.id };
+      books.set(bookKey(item), item);
+    }
+  }
+  return current.shelf.flatMap(key => books.has(key) ? [books.get(key)!] : []);
+}
+
+export function setShelfBook(current: LibraryData, book: Book, present: boolean): LibraryData {
+  const key = bookKey(book);
+  if (present && !current.definitions.some(entry => definitionId(entry) === book.sourceId && (isRuleSource(entry) || entry.document.books.some(item => item.id === book.id)))) {
+    throw new Error('书籍所属书源已被删除或修改。');
+  }
+  return reconcileShelf({
+    ...current,
+    shelf: present ? [...new Set([...current.shelf, key])] : current.shelf.filter(item => item !== key),
+    shelfBooks: [...(current.shelfBooks ?? []).filter(item => bookKey(item) !== key), ...(present ? [snapshotBook(book)] : [])],
+  });
+}
 
 export function parseSourceImport(input: string): RuleManagedSource[] {
   const raw = readSourceJson(input);
@@ -45,7 +94,8 @@ export function saveDefinition(current: LibraryData, document: RuleSourceDocumen
   const entry: RuleManagedSource = { document: validated, enabled, kind: 'legado' };
   const definitions = existing ? current.definitions.map(item => definitionId(item) === existingId ? entry : item) : [...current.definitions, entry];
   const shelf = current.shelf.map(key => existingId && key.startsWith(`${existingId}/`) ? `${newId}/${key.slice(existingId.length + 1)}` : key);
-  return { ...current, definitions, shelf: pruneShelf(shelf, definitions) };
+  const shelfBooks = current.shelfBooks?.map(book => book.sourceId === existingId ? { ...book, sourceId: newId } : book);
+  return reconcileShelf({ ...current, definitions, shelf, shelfBooks });
 }
 
 export function mergeSources(current: LibraryData, incoming: RuleManagedSource[], replace: boolean): { data: LibraryData; added: number; updated: number; skipped: number } {
@@ -58,13 +108,13 @@ export function mergeSources(current: LibraryData, incoming: RuleManagedSource[]
     else if (replace) { definitions[index] = entry; updated++; }
     else skipped++;
   }
-  return { data: { ...current, definitions, shelf: pruneShelf(current.shelf, definitions) }, added, updated, skipped };
+  return { data: reconcileShelf({ ...current, definitions }), added, updated, skipped };
 }
 
 export function deleteDefinition(current: LibraryData, id: string): LibraryData {
   if (isFanqieSourceId(id)) throw new Error('内置番茄书源不可删除，可选择禁用。');
   const definitions = current.definitions.filter(item => definitionId(item) !== id);
-  return { ...current, definitions, shelf: pruneShelf(current.shelf, definitions) };
+  return reconcileShelf({ ...current, definitions });
 }
 
 export function setAllRuleSourcesEnabled(current: LibraryData, enabled: boolean): LibraryData {
@@ -79,7 +129,7 @@ export function setAllRuleSourcesEnabled(current: LibraryData, enabled: boolean)
 export function deleteRuleSources(current: LibraryData, ids: string[]): LibraryData {
   const selected = new Set(ids);
   const definitions = current.definitions.filter(entry => !isRuleSource(entry) || isFanqieSourceId(definitionId(entry)) || !selected.has(definitionId(entry)));
-  return { ...current, definitions, shelf: pruneShelf(current.shelf, definitions) };
+  return reconcileShelf({ ...current, definitions });
 }
 
 export function parseLibraryData(input: string): LibraryData {
@@ -105,5 +155,7 @@ export function parseLibraryData(input: string): LibraryData {
   const fanqieIndex = definitions.findIndex(entry => isFanqieSourceId(definitionId(entry)));
   if (fanqieIndex < 0) definitions.unshift(fanqieSource());
   else definitions[fanqieIndex] = fanqieSource(definitions[fanqieIndex].enabled);
-  return { version: 1, definitions, shelf: pruneShelf(raw.shelf as string[], definitions) };
+  if (raw.shelfBooks !== undefined && !Array.isArray(raw.shelfBooks)) throw new Error('本地书架数据格式无效。');
+  const shelfBooks = (raw.shelfBooks as unknown[] | undefined)?.map(snapshotBook) ?? [];
+  return reconcileShelf({ version: 1, definitions, shelf: raw.shelf as string[], shelfBooks });
 }

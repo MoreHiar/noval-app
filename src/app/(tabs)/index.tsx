@@ -1,5 +1,5 @@
 import { Link } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookCarousel } from '../../components/BookCarousel';
@@ -9,25 +9,25 @@ import { Book } from '../../domain/books';
 import { useLibrary } from '../../state/library';
 
 export default function ShelfScreen() {
-  const { sources, shelf } = useLibrary();
+  const { shelfBooks: books, setBookOnShelf, ready, storageError, retryLoad } = useLibrary();
   const insets = useSafeAreaInsets();
-  const [books, setBooks] = useState<Book[]>([]);
-  const [requestedIndex, setSelectedIndex] = useState(3);
+  const [requestedIndex, setSelectedIndex] = useState(0);
+  const [removingKey, setRemovingKey] = useState('');
+  const [shelfError, setShelfError] = useState('');
   const [listMode, setListMode] = useState(false);
   const select = useCallback((index: number) => setSelectedIndex(index), []);
 
-  useEffect(() => {
-    let active = true;
-    Promise.all(shelf.map(async (key) => {
-      const split = key.indexOf('/');
-      const sourceId = key.slice(0, split);
-      const bookId = key.slice(split + 1);
-      return sources.find((source) => source.info.id === sourceId)?.getBook(bookId) ?? null;
-    })).then((items) => {
-      if (active) setBooks(items.filter((item): item is Book => item !== null));
-    });
-    return () => { active = false; };
-  }, [sources, shelf]);
+  const removeBook = async (book: Book) => {
+    setShelfError(''); setRemovingKey(`${book.sourceId}/${book.id}`);
+    try { await setBookOnShelf(book, false); }
+    catch (error) { setShelfError(error instanceof Error ? error.message : '移除失败，请重试。'); }
+    finally { setRemovingKey(''); }
+  };
+  const removeButton = (book: Book) => (
+    <Pressable style={styles.removeButton} onPress={() => removeBook(book)} disabled={!!removingKey || !ready} accessibilityRole="button" accessibilityLabel={`将${book.title}从书架移除`} accessibilityState={{ disabled: !!removingKey || !ready }}>
+      <Text style={styles.removeText}>{removingKey === `${book.sourceId}/${book.id}` ? '正在移除…' : '从书架移除'}</Text>
+    </Pressable>
+  );
 
   const selectedIndex = Math.min(requestedIndex, Math.max(books.length - 1, 0));
   const selectedBook = books[selectedIndex];
@@ -48,14 +48,20 @@ export default function ShelfScreen() {
           <Pressable onPress={() => setListMode((current) => !current)} style={styles.modeButton} accessibilityRole="button" accessibilityLabel={listMode ? '切换立体书架' : '切换列表'}><Text style={styles.modeIcon}>{listMode ? '▥' : '☷'}</Text></Pressable>
         </View>
       </View>
-      {books.length === 0 ? (
+      {shelfError ? <Text accessibilityRole="alert" style={styles.error}>{shelfError}</Text> : null}
+      {!ready ? (
+        <View style={styles.empty}>
+          <Text accessibilityRole={storageError ? 'alert' : undefined} style={styles.emptyBody}>{storageError || '正在加载书架…'}</Text>
+          {storageError ? <Pressable style={styles.emptyButton} onPress={retryLoad} accessibilityRole="button"><Text style={styles.emptyButtonText}>重试</Text></Pressable> : null}
+        </View>
+      ) : books.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>书架还空着</Text>
-          <Text style={styles.emptyBody}>去发现页挑一本书，开始阅读。</Text>
+          <Text style={styles.emptyBody}>搜索喜欢的书籍，在详情页加入书架。</Text>
           <Link href="/discover" asChild><Pressable style={styles.emptyButton}><Text style={styles.emptyButtonText}>探索书库 →</Text></Pressable></Link>
         </View>
       ) : listMode ? (
-        <View style={styles.list}>{books.map((book) => <BookCard key={`${book.sourceId}/${book.id}`} book={book} />)}</View>
+        <View style={styles.list}>{books.map((book) => <View key={`${book.sourceId}/${book.id}`} style={styles.listItem}><BookCard book={book} />{removeButton(book)}</View>)}</View>
       ) : (
         <>
           <BookCarousel books={books} selectedIndex={selectedIndex} onSelect={select} />
@@ -74,6 +80,7 @@ export default function ShelfScreen() {
               <View style={styles.featuredArrow}><Text style={styles.featuredArrowText}>↗</Text></View>
             </Pressable>
           </Link>}
+          {selectedBook ? removeButton(selectedBook) : null}
         </>
       )}
     </ScrollView>
@@ -113,6 +120,10 @@ const styles = StyleSheet.create({
   featuredArrow: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, borderWidth: 1, borderColor: '#D8DDD4' },
   featuredArrowText: { color: '#343B34', fontSize: 20 },
   list: { marginTop: 20 },
+  listItem: { marginBottom: 14 },
+  removeButton: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-end' },
+  removeText: { color: theme.muted, fontSize: 13 },
+  error: { color: '#A44036', fontSize: 13, marginTop: 12 },
   empty: { alignItems: 'center', paddingTop: 85, paddingBottom: 70 },
   emptyTitle: { color: theme.ink, fontSize: 20, fontWeight: '800', marginBottom: 10 },
   emptyBody: { color: theme.muted, fontSize: 13, marginBottom: 22 },
