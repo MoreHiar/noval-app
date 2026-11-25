@@ -13,6 +13,7 @@ import { browserSearch, browserSearchRules } from './browser-search';
 import { loadBrowserPage } from './browser-session';
 import { createQidianReader } from './qidian-reader';
 import { createBrowserReader } from './browser-reader';
+import { isQingtianSearch, qingtianBookUrl, qingtianSearchRequest } from './qingtian-search';
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
 const TIMEOUT_MS = 20000;
@@ -44,6 +45,7 @@ function headersFrom(value: unknown): Record<string, string> {
 }
 
 export function buildSearchRequest(document: RuleSourceDocument, keyword: string) {
+  if (isQingtianSearch(document)) return qingtianSearchRequest(keyword);
   const endpoint = browserSearch(document,keyword)?.url ?? (isYuyoukuFormSearch(document) ? 'https://www.yuyouku.com/' : document.searchUrl?.trim());
   if (!endpoint) throw new UnsupportedSearchRule('此书源没有搜索地址。');
   if (/java\.getVerificationCode\s*\(/.test(endpoint)) throw new UnsupportedSearchRule('此书源搜索需要浏览器会话和人工验证码；当前尚未接入验证流程，配置完整也不能直接搜索。');
@@ -110,10 +112,11 @@ function compileSearch(document: RuleSourceDocument) {
   if (document.bookSourceType !== undefined && document.bookSourceType !== 0) throw new UnsupportedSearchRule('搜索暂仅支持文本书源。');
   buildSearchRequest(document, 'test');
   const rules = browserSearch(document,'test') ? browserSearchRules(document) : searchRulesFor(document);
+  const qingtian = isQingtianSearch(document);
   const list = compileListRule(rules.bookList);
   if (typeof rules.name !== 'string' || !rules.name.trim() || typeof rules.bookUrl !== 'string' || !rules.bookUrl.trim()) throw new UnsupportedSearchRule('缺少书名或书籍链接搜索规则。');
   const name = compileFieldRule(rules.name);
-  const bookUrl = compileFieldRule(rules.bookUrl);
+  const bookUrl = qingtian ? qingtianBookUrl : compileFieldRule(rules.bookUrl);
   const optional = (expression: unknown) => {
     try { return compileFieldRule(expression); }
     catch { return () => ''; }

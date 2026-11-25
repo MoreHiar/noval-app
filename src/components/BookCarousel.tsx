@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Book } from '../domain/books';
+import { BookCover } from './BookCover';
 import { theme } from './theme';
 
 const INPUT = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
@@ -84,9 +85,11 @@ export function BookCarousel({ books, selectedIndex, onSelect }: {
                 <View style={styles.coverTop}>
                   <Text style={styles.coverSeries}>NOVAL  /  BOOKS</Text>
                   <View style={[styles.artFrame, { borderColor: book.accent }]}>
-                    <View style={[styles.artSun, { backgroundColor: book.accent }]} />
-                    <View style={[styles.artHill, { backgroundColor: book.accent }]} />
-                    <View style={styles.artLine} />
+                    {book.coverUrl || book.coverFallbackUrl ? <BookCover book={book} style={styles.artCover} /> : <>
+                      <View style={[styles.artSun, { backgroundColor: book.accent }]} />
+                      <View style={[styles.artHill, { backgroundColor: book.accent }]} />
+                      <View style={styles.artLine} />
+                    </>}
                   </View>
                 </View>
                 <View>
@@ -118,6 +121,7 @@ const styles = StyleSheet.create({
   coverTop: { flex: 1 },
   coverSeries: { color: '#817F79', fontSize: 5, letterSpacing: 0.7, marginBottom: 9 },
   artFrame: { height: 91, borderWidth: 1, overflow: 'hidden', backgroundColor: '#F2F0E9' },
+  artCover: { width: '100%', height: '100%', borderRadius: 0, padding: 5 },
   artSun: { width: 26, height: 26, borderRadius: 13, opacity: 0.62, position: 'absolute', top: 13, right: 13 },
   artHill: { width: 108, height: 64, opacity: 0.8, position: 'absolute', bottom: -27, left: -12, transform: [{ rotateZ: '-25deg' }] },
   artLine: { width: 96, height: 1, backgroundColor: '#FFFFFF99', position: 'absolute', bottom: 25, left: 4, transform: [{ rotateZ: '-24deg' }] },

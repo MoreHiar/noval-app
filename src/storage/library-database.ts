@@ -8,11 +8,9 @@ type ShelfRow = { source_id: string; book_id: string; position: number; metadata
 
 export const LEGACY_LIBRARY_KEY = 'noval.library.v1';
 
-export const SOURCE_RESET_ID = 'user-source-reset-2026-11-24';
-
-export async function createLibraryDatabase(db: Database, options: { resetSources?: boolean; defaultBundle?: {id:string;sources:RuleManagedSource[]} } = {}) {
+export async function createLibraryDatabase(db: Database, options: { defaultBundle?: { id: string; sources: RuleManagedSource[] } } = {}) {
   const schema = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
-  if (schema && schema.user_version > 4) throw new Error('本地数据库由更新版本创建，请更新应用。');
+  if (schema && schema.user_version > 5) throw new Error('本地数据库由更新版本创建，请更新应用。');
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
     PRAGMA journal_size_limit = 1048576;
@@ -41,12 +39,8 @@ export async function createLibraryDatabase(db: Database, options: { resetSource
     CREATE TABLE IF NOT EXISTS default_source_bundles (
       id TEXT PRIMARY KEY NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS library_backups (
-      id TEXT PRIMARY KEY NOT NULL,
-      payload TEXT NOT NULL
-    );
-    PRAGMA user_version = 4;
   `);
+  if ((schema?.user_version ?? 0) < 5) await db.execAsync('PRAGMA user_version = 5;');
 
   async function write(current: LibraryData) {
     const definitions = JSON.stringify(current.definitions);
@@ -80,25 +74,12 @@ export async function createLibraryDatabase(db: Database, options: { resetSource
   }
 
   async function prepareLibrary(current: LibraryData, initialize = false): Promise<LibraryData> {
-    const reset = options.resetSources && !await db.getFirstAsync('SELECT id FROM library_backups WHERE id = ?', SOURCE_RESET_ID);
-    if (!reset) {
-      if (initialize) await write(current);
-      return installDefaults(current);
-    }
-    const progress = await db.getAllAsync('SELECT * FROM reading_progress');
-    await db.runAsync('INSERT INTO library_backups (id, payload) VALUES (?, ?)', SOURCE_RESET_ID, JSON.stringify({ library: current, progress }));
-    const next: LibraryData = { version: 1, definitions: [], shelf: [], shelfBooks: [] };
-    // The recovery snapshot and one-time reset commit together. Future imports are untouched.
+    if (initialize) await write(current);
+    const bundle = options.defaultBundle;
+    if (!bundle || await db.getFirstAsync('SELECT id FROM default_source_bundles WHERE id = ?', bundle.id)) return current;
+    const next = mergeSources(current, bundle.sources, false).data;
     await write(next);
-    return installDefaults(next);
-  }
-
-  async function installDefaults(current:LibraryData):Promise<LibraryData> {
-    const bundle=options.defaultBundle;
-    if(!bundle||await db.getFirstAsync('SELECT id FROM default_source_bundles WHERE id = ?',bundle.id))return current;
-    const next=mergeSources(current,bundle.sources,false).data;
-    await write(next);
-    await db.runAsync('INSERT INTO default_source_bundles (id) VALUES (?)',bundle.id);
+    await db.runAsync('INSERT INTO default_source_bundles (id) VALUES (?)', bundle.id);
     return next;
   }
 

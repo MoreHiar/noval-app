@@ -21,6 +21,58 @@ const document = {
   ruleSearch: { bookList: 'class.item', name: 'tag.h3.0@tag.a.0@text', author: 'tag.p.1@tag.a.0@text##作者：', bookUrl: 'tag.a.0@href', intro: '.intro@text' },
 };
 const html = '<script>const unused = "<div>";</script><div class="item"><h3><a href="../book/1?a=1&amp;b=2">书生 &amp; 山海</a></h3><p>玄幻</p><p><a>作者：某人</a></p><p class="intro">故事 &lt;开始&gt;</p></div>';
+const qingtian = {
+  bookSourceName: '🔅A晴天聚合5.4.8(终极版)', bookSourceUrl: '晴天融合VIP4.0',
+  jsLib: "var host = ['https://v1.gyks.cf'];",
+  searchUrl: '<js>\n`${base_url}/search?title=${key}&tab=${media}&source=${sources}&page={{page}}&disabled_sources=${disabled_sources},${op}`\n</js>',
+  ruleSearch: {
+    bookList: '$.data', name: '$.book_name##（别名：.*?）', author: '$.author', intro: '$.abstract',
+    coverUrl: '$.thumb_url', kind: '{{$.status}},{{$.score}},{{$.tags}},{{$.last_chapter_update_time}}',
+    bookUrl: '<js>\n`data:;base64,${qtdetail},{"type":"qingtian"}`\n</js>',
+  },
+};
+
+test('known Qingtian search translates mode and source shortcuts without running imported scripts', async t => {
+  const before = JSON.stringify(qingtian);
+  for (const [input, title, tab, source] of [
+    ['十日终焉', '十日终焉', '小说', '全部'],
+    ['x:十日终焉@番茄', '十日终焉', '小说', '番茄'],
+    ['t：三体@七猫', '三体', '听书', '七猫'],
+    ['m:画集@漫画源', '画集', '漫画', '漫画源'],
+    ['d:短剧@', '短剧', '短剧', '全部'],
+  ]) {
+    const request = buildSearchRequest(qingtian, input);
+    const url = new URL(request.url);
+    assert.equal(url.hostname, 'v1.gyks.cf');
+    assert.equal(url.searchParams.get('title'), title);
+    assert.equal(url.searchParams.get('tab'), tab);
+    assert.equal(url.searchParams.get('source'), source);
+    assert.equal(url.searchParams.get('page'), '1');
+    assert.equal(url.searchParams.get('disabled_sources'), '0');
+    assert.equal(request.init.method, 'GET');
+  }
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ data: [
+    { book_id: '123', source: '番茄', tab: '小说', book_name: '十日终焉（别名：末日）', author: '作者甲', abstract: '简介', thumb_url: 'https://images.example/123.jpg', status: '连载' },
+    { book_id: '456', source: '七猫', book_name: '第二本', author: '作者乙' },
+    { source: '无效', book_name: '缺少 ID' },
+  ] }));
+  const adapter = createLegadoSearchAdapter(qingtian);
+  assert.equal(adapter.searchUnavailableReason, undefined);
+  const books = await adapter.search('十日终焉@番茄');
+  assert.deepEqual(books.map(book => book.title), ['十日终焉', '第二本']);
+  assert.equal(books[0].author, '作者甲');
+  assert.equal(books[0].summary, '简介');
+  assert.equal(books[0].coverUrl, 'https://images.example/123.jpg');
+  const idUrl = books[0].id.slice(4).match(/.{4}/g).map(hex => String.fromCharCode(parseInt(hex, 16))).join('');
+  assert.equal(new URL(idUrl).searchParams.get('book_id'), '123');
+  assert.equal(new URL(idUrl).searchParams.get('source'), '番茄');
+  assert.equal(new URL(idUrl).searchParams.get('tab'), '小说');
+  assert.deepEqual(await adapter.getChapters(books[0].id), []);
+  assert.equal(JSON.stringify(qingtian), before);
+  const changed = { ...qingtian, searchUrl: '<js>globalThis.injected = true</js>' };
+  assert.match(createLegadoSearchAdapter(changed).searchUnavailableReason, /脚本/);
+  assert.equal(globalThis.injected, undefined);
+});
 
 test('user-provided Qidian XPath definition searches the current SSR layout without altering stored rules', async t => {
   const source = fiveSources[2];

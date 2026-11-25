@@ -1,11 +1,10 @@
-import documents from './defaults/selected-four.json';
-import { parseRuleSource } from './legado';
+import document from '../../docs/sources/jgwxs.json';
 import type { RuleManagedSource } from '../domain/books';
+import { parseRuleSource } from './legado';
 
-export const selectedDefaultBundle = {
-  id:'selected-four-2026-11-24-v1',
-  sources:documents.map(value=>{
-    const document=parseRuleSource(value);
-    return {kind:'legado',document,enabled:document.enabled??true} as RuleManagedSource;
-  }),
+const source = { ...parseRuleSource(document), bookSourceGroup: '内置' };
+
+export const jgwxsDefaultBundle: { id: string; sources: RuleManagedSource[] } = {
+  id: 'jgwxs-2026-11-25-v1',
+  sources: [{ kind: 'legado', document: source, enabled: source.enabled ?? true }],
 };

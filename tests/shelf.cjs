@@ -15,7 +15,8 @@ const { javascriptDocument } = require('../src/sources/javascript.ts');
 const { definitionId } = require('../src/sources/legado.ts');
 const { createLegadoSearchAdapter } = require('../src/sources/legado-search.ts');
 const { bookKey, deleteDefinition, deleteRuleSources, getShelfBooks, mergeSources, parseLibraryData, saveDefinition, setAllRuleSourcesEnabled, setShelfBook } = require('../src/sources/management.ts');
-const { createLibraryDatabase, SOURCE_RESET_ID } = require('../src/storage/library-database.ts');
+const { createLibraryDatabase } = require('../src/storage/library-database.ts');
+const { jgwxsDefaultBundle } = require('../src/sources/defaults.ts');
 
 
 const initial = () => ({ version: 1, definitions: [fanqieSource(), { kind: 'javascript', enabled: true, document: javascriptDocument }], shelf: ['js-example/clock'] });
@@ -190,7 +191,7 @@ test('reading position survives a cold database open, rejects stale writes, and 
   await store.saveProgress({ ...position, chapterId: '1', offset: 0, updatedAt: 100 });
   const cold = await createLibraryDatabase(db);
   assert.deepEqual({ ...await cold.getProgress(position.sourceId, position.bookId) }, position);
-  assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 4);
+  assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 5);
   await assert.rejects(store.saveProgress({ ...position, offset: -1 }), /进度格式无效/);
   data = setShelfBook(data, book(), false);
   await store.save(data);
@@ -214,82 +215,92 @@ test('progress keeps only 200 recent books and removing a source cleans its hist
   await assert.rejects(store.saveProgress({ sourceId: definitionId(extra), bookId: '204', chapterId: '2', chapterTitle: '第二章', offset: 0, updatedAt: 300 }), /书源已被删除/);
 });
 
-test('schema version 1 upgrades without altering existing shelf rows', async t => {
+test('schema version 1 preserves old sources, shelf rows and backup payloads', async t => {
   const { store, db, raw } = await database(t);
   await store.load(initial(), noLegacy);
+  raw.exec('CREATE TABLE library_backups (id TEXT PRIMARY KEY, payload TEXT NOT NULL);');
+  raw.prepare('INSERT INTO library_backups (id, payload) VALUES (?, ?)').run('old', JSON.stringify(initial()));
   raw.exec('DROP TABLE reading_progress; PRAGMA user_version = 1;');
   const upgraded = await createLibraryDatabase(db);
-  assert.deepEqual((await upgraded.load(initial(), forbiddenLegacy)).shelf, initial().shelf);
-  assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 4);
+  assert.deepEqual((await upgraded.load({ version: 1, definitions: [], shelf: [] }, noLegacy)).definitions, initial().definitions);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM shelf_books').get().count, 1);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM library_backups').get().count, 1);
+  assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 5);
   raw.exec('PRAGMA user_version = 999;');
   await assert.rejects(createLibraryDatabase(db), /更新版本/);
   assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 999);
 });
 
 
-test('requested source reset snapshots data and progress once, then preserves new imports', async t => {
+test('version 4 upgrade keeps collections and history while installing Jgwxs once', async t => {
   const { store, db, raw } = await database(t);
   const old = setShelfBook(initial(), book(), true);
   await store.save(old);
   const progress = { sourceId: fanqieSourceId, bookId: book().id, chapterId: '2', chapterTitle: '第二章', offset: 150, updatedAt: 100 };
   await store.saveProgress(progress);
-  raw.exec('PRAGMA user_version = 3;');
-  const upgraded = await createLibraryDatabase(db, { resetSources: true });
-  const cleared = await upgraded.load(initial(), forbiddenLegacy);
-  assert.deepEqual(cleared, { version: 1, definitions: [], shelf: [], shelfBooks: [] });
-  assert.equal(raw.prepare('SELECT count(*) AS count FROM shelf_books').get().count, 0);
-  assert.equal(raw.prepare('SELECT count(*) AS count FROM reading_progress').get().count, 0);
-  const backup = JSON.parse(raw.prepare('SELECT payload FROM library_backups WHERE id = ?').get(SOURCE_RESET_ID).payload);
-  assert.deepEqual(backup.library.definitions, old.definitions);
-  assert.deepEqual(backup.library.shelf, old.shelf);
-  assert.deepEqual(getShelfBooks(backup.library), getShelfBooks(old));
-  assert.equal(backup.progress[0].offset, 150);
-  const imported = mergeSources(cleared, [fanqieSource(false)], false).data;
-  await upgraded.save(imported);
-  const cold = await (await createLibraryDatabase(db, { resetSources: true })).load(initial(), forbiddenLegacy);
-  assert.deepEqual(cold, imported);
+  raw.exec('CREATE TABLE library_backups (id TEXT PRIMARY KEY, payload TEXT NOT NULL);');
+  raw.prepare('INSERT INTO library_backups (id, payload) VALUES (?, ?)').run('old', JSON.stringify({ library: old }));
+  raw.exec('PRAGMA user_version = 4;');
+  const upgraded = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle });
+  const installed = await upgraded.load({ version: 1, definitions: [], shelf: [] }, noLegacy);
+  const jgwxsId = definitionId(jgwxsDefaultBundle.sources[0]);
+  assert.deepEqual(installed.shelf, old.shelf);
+  assert.deepEqual(installed.definitions.slice(0, old.definitions.length), old.definitions);
+  assert.equal(installed.definitions.at(-1).document.bookSourceName, '甲骨文小说');
+  assert.equal(installed.definitions.filter(source => definitionId(source) === jgwxsId).length, 1);
+  assert.deepEqual({ ...await upgraded.getProgress(progress.sourceId, progress.bookId) }, progress);
   assert.equal(raw.prepare('SELECT count(*) AS count FROM library_backups').get().count, 1);
+  const removed = deleteDefinition(installed, jgwxsId);
+  await upgraded.save(removed);
+  const cold = await (await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle })).load({ version: 1, definitions: [], shelf: [] }, forbiddenLegacy);
+  assert.deepEqual(cold, removed);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count, 1);
 });
 
-test('source reset failure rolls back backup, sources, shelf and progress and can retry', async t => {
+test('built-in Jgwxs keeps an existing same-address custom source', async t => {
+  const { store, db } = await database(t);
+  const custom = { ...jgwxsDefaultBundle.sources[0], enabled: false, document: { ...jgwxsDefaultBundle.sources[0].document, bookSourceName: '我的甲骨文', enabled: false } };
+  await store.load({ version: 1, definitions: [custom], shelf: [] }, noLegacy);
+  const upgraded = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle });
+  const result = await upgraded.load({ version: 1, definitions: [], shelf: [] }, forbiddenLegacy);
+  assert.deepEqual(result.definitions, [custom]);
+});
+
+test('failed built-in source installation rolls back its definition and marker', async t => {
   const { store, db, raw, fail } = await database(t);
+  await store.load(initial(), noLegacy);
+  fail(/INSERT INTO default_source_bundles/);
+  const installing = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle });
+  await assert.rejects(installing.load({ version: 1, definitions: [], shelf: [] }, forbiddenLegacy), /disk write failure/);
+  assert.deepEqual(JSON.parse(raw.prepare('SELECT definitions FROM library_settings').get().definitions), initial().definitions);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count, 0);
+  fail(undefined);
+  assert.equal((await installing.load({ version: 1, definitions: [], shelf: [] }, forbiddenLegacy)).definitions.length, 3);
+});
+
+test('version 5 data remains unchanged after reopening', async t => {
+  const { store, db, raw } = await database(t);
   const old = setShelfBook(initial(), book(), true);
   await store.save(old);
   await store.saveProgress({ sourceId: fanqieSourceId, bookId: book().id, chapterId: '1', chapterTitle: '首章', offset: 10, updatedAt: 100 });
-  const resetting = await createLibraryDatabase(db, { resetSources: true });
-  fail(/DELETE FROM shelf_books/);
-  await assert.rejects(resetting.load(initial(), forbiddenLegacy), /disk write failure/);
-  assert.equal(raw.prepare('SELECT count(*) AS count FROM library_backups').get().count, 0);
+  const reopened = await createLibraryDatabase(db);
+  const restored = await reopened.load({ version: 1, definitions: [], shelf: [] }, forbiddenLegacy);
+  assert.deepEqual(restored.definitions, old.definitions);
+  assert.deepEqual(restored.shelf, old.shelf);
   assert.equal(JSON.parse(raw.prepare('SELECT definitions FROM library_settings').get().definitions).length, 2);
   assert.equal(raw.prepare('SELECT count(*) AS count FROM shelf_books').get().count, 2);
   assert.equal(raw.prepare('SELECT count(*) AS count FROM reading_progress').get().count, 1);
-  fail(undefined);
-  assert.deepEqual((await resetting.load(initial(), forbiddenLegacy)).definitions, []);
 });
 
-test('fresh and legacy installs remain empty after reset without importing old defaults again', async t => {
+test('fresh and legacy installs add only Jgwxs', async t => {
   for (const legacy of [null, JSON.stringify(initial())]) {
     const { db, raw } = await database(t);
-    const store = await createLibraryDatabase(db, { resetSources: true });
+    const store = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle });
     const empty = { version: 1, definitions: [], shelf: [] };
-    assert.deepEqual((await store.load(empty, async () => legacy)).definitions, []);
-    assert.deepEqual((await store.load(empty, forbiddenLegacy)).definitions, []);
-    assert.equal(raw.prepare('SELECT count(*) AS count FROM library_backups').get().count, 1);
+    const loaded = await store.load(empty, async () => legacy);
+    assert.equal(loaded.definitions.length, legacy ? 3 : 1);
+    assert.equal(loaded.definitions.at(-1).document.bookSourceName, '甲骨文小说');
+    assert.equal((await store.load(empty, forbiddenLegacy)).definitions.length, loaded.definitions.length);
+    assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count, 1);
   }
-});
-
-test('four newly selected defaults install once, preserve same-address edits and do not return after deletion',async t=>{
-  const {selectedDefaultBundle}=require('../src/sources/defaults.ts');
-  assert.deepEqual(selectedDefaultBundle.sources.map(x=>x.document.bookSourceName),['哔哩轻小说','起点男频','笔趣庭','笔趣阁94']);
-  const {db,store,raw}=await database(t);
-  const custom={...selectedDefaultBundle.sources[1],enabled:false,document:{...selectedDefaultBundle.sources[1].document,enabled:false,bookSourceName:'我的起点'}};
-  await store.save({...initial(),definitions:[...initial().definitions,custom]});
-  const updated=await createLibraryDatabase(db,{defaultBundle:selectedDefaultBundle});
-  let current=await updated.load(initial(),forbiddenLegacy);
-  assert.equal(current.definitions.length,6);
-  assert.deepEqual(current.definitions.find(x=>definitionId(x)===definitionId(custom)),custom);
-  assert.deepEqual(current.shelf,initial().shelf);
-  current=deleteDefinition(current,definitionId(selectedDefaultBundle.sources[0]));await updated.save(current);
-  assert.deepEqual(await(await createLibraryDatabase(db,{defaultBundle:selectedDefaultBundle})).load(initial(),forbiddenLegacy),current);
-  assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count,1);
 });

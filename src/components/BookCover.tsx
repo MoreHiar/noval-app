@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { Book } from '../domain/books';
 
-export function BookCover({ book, large = false }: { book: Book; large?: boolean }) {
+export function BookCover({ book, large = false, style }: { book: Book; large?: boolean; style?: StyleProp<ViewStyle> }) {
   const [failed, setFailed] = useState<{ key: string; urls: string[] }>({ key: '', urls: [] });
   const key = `${book.sourceId}/${book.id}`;
   const failedUrls = failed.key === key ? failed.urls : [];
@@ -10,7 +10,7 @@ export function BookCover({ book, large = false }: { book: Book; large?: boolean
   const showImage = !!uri;
 
   return (
-    <View style={[styles.cover, large && styles.large, { backgroundColor: book.accent }]}>
+    <View style={[styles.cover, large && styles.large, { backgroundColor: book.accent }, style]}>
       {showImage ? (
         <Image key={uri} source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`${book.title}封面`} onError={() => setFailed(current => ({ key, urls: [...(current.key === key ? current.urls : []), uri] }))} />
       ) : (

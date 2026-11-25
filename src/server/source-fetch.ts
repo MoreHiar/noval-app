@@ -14,6 +14,7 @@ const sourceHosts = new Set([
   'www.81zw2.com', 'www.50zw.so',
   'novel.snssdk.com', 'fanqienovel.com',
   'm.qidian.com', 'www.yuyouku.com',
+  'v1.gyks.cf',
   'www.jgwxs.com',
   // Exact public sites in the user-selected Yiove default collection.
   'm.cuoceng.org', 'm.jhssd.com', 'm.libahao.com', 'm.powenwu16.com', 'www.20xs.org',
