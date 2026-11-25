@@ -16,6 +16,7 @@ function BrowserWindow({task}:{task:BrowserTask}) {
   const [error,setError] = useState('');
   const [text,setText] = useState('');
   const [width,setWidth] = useState(390);
+  const [interactive,setInteractive] = useState(task.request.source !== 'washai');
   const busy = useRef(false);
   const perform = async (action: string, extra: Record<string,unknown> = {}) => {
     if (!task || busy.current) return;
@@ -28,8 +29,14 @@ function BrowserWindow({task}:{task:BrowserTask}) {
       sessions.set(task.request.source,result.id);
       setError('');
       if (result.ready) task.finish({url:result.url,html:result.html});
-      else if (result.screenshot) setScreenshot(`data:image/jpeg;base64,${result.screenshot}`);
-    } catch (cause) { if (currentBrowserTask()?.id === task.id) setError(cause instanceof Error ? cause.message : '网页连接失败。'); }
+      else if (result.screenshot) { setScreenshot(`data:image/jpeg;base64,${result.screenshot}`); setInteractive(true); }
+    } catch (cause) {
+      if (currentBrowserTask()?.id === task.id) {
+        const message = cause instanceof Error ? cause.message : '网页连接失败。';
+        if (task.request.source === 'washai') task.fail(new Error(message));
+        else setError(message);
+      }
+    }
     finally { busy.current = false; }
   };
   useEffect(() => {
@@ -40,7 +47,7 @@ function BrowserWindow({task}:{task:BrowserTask}) {
     // Each task owns a navigation; action callbacks use the same task until completion.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[task?.id]);
-  if (!task) return null;
+  if (!interactive) return null;
   return <Modal visible transparent onRequestClose={() => task.fail(new Error('已取消网页验证。'))}>
     <View style={styles.backdrop}><ScrollView style={styles.panel} contentContainerStyle={styles.panelContent}>
       <View style={styles.row}><Text style={styles.title}>{task.request.name} · {task.request.purpose}</Text><BrowserButton label="取消" onPress={() => task.fail(new Error('已取消网页验证。'))}/></View>

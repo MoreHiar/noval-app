@@ -1,6 +1,7 @@
 import type { SearchRequest, SearchResponse } from './search-transport';
+import { createWashaiTransport } from './washai-transport';
 
-export async function fetchSearchResponse(request: SearchRequest, signal: AbortSignal): Promise<SearchResponse> {
+async function fetchDirectResponse(request: SearchRequest, signal: AbortSignal): Promise<SearchResponse> {
   let response: Response;
   try {
     response = await fetch('/api/source-fetch', {
@@ -23,3 +24,5 @@ export async function fetchSearchResponse(request: SearchRequest, signal: AbortS
     text: async () => result.body,
   };
 }
+
+export const fetchSearchResponse = createWashaiTransport(fetchDirectResponse);

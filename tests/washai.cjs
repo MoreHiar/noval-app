@@ -13,6 +13,8 @@ const { urlBookId } = require('../src/sources/browser-reader.ts');
 const { createLegadoSearchAdapter } = require('../src/sources/legado-search.ts');
 const { jgwxsDefaultBundle, washaiDefaultBundle } = require('../src/sources/defaults.ts');
 const { parseWashaiBook, parseWashaiCatalogPage, parseWashaiChapter } = require('../src/sources/washai-reader.ts');
+const { createWashaiTransport, washaiPageRequest } = require('../src/sources/washai-transport.ts');
+const { currentBrowserTask, subscribeBrowser } = require('../src/sources/browser-session.ts');
 
 const number = '1262260513468565585';
 const bookId = urlBookId(`https://book.washai.net/book/${number}.html`);
@@ -29,7 +31,7 @@ const pageHtml = (page, count = 101) => {
 };
 const chapterHtml = (id = chapterId(1), book = number, needBuy = false) => `<div id="showReading"><section class="readChapterPrimaryBlock" data-index-id="${id}"><div class="readChapterAppendBody"><p>第一段。</p><p>第二段<br>换行。</p></div></section></div><script id="readPageBootstrap" type="application/json">${JSON.stringify({ book: { id: book }, bookIndex: { id, bookId: book, indexName: '第1章' }, needBuy })}</script>`;
 
-test('washai built-in source searches, loads complete paginated catalog and reads public chapters', async t => {
+test('washai fixture parsing searches, loads complete paginated catalog and reads public chapters (mocked HTTP)', async t => {
   const requests = [];
   t.mock.method(globalThis, 'fetch', async url => {
     const value = String(url);
@@ -51,6 +53,69 @@ test('washai built-in source searches, loads complete paginated catalog and read
   assert.deepEqual((await adapter.getChapter(bookId, chapterId(1))).paragraphs, ['第一段。', '第二段', '换行。']);
   await assert.rejects(adapter.getChapter(bookId, chapterId(101)), /解锁/);
   assert.equal(requests.length, 5);
+});
+
+test('washai Cloudflare 403 opens verification and reuses browser transport for search, catalog and chapters', async t => {
+  let directRequests = 0;
+  const browserRequests = [];
+  t.mock.method(globalThis, 'fetch', async () => {
+    directRequests++;
+    return new Response('<title>Just a moment...</title>', { status: 403, headers: { 'cf-mitigated': 'challenge' } });
+  });
+  const unsubscribe = subscribeBrowser(() => {
+    const task = currentBrowserTask();
+    if (!task || browserRequests.some(request => request.id === task.id)) return;
+    browserRequests.push({ id: task.id, ...task.request });
+    queueMicrotask(() => {
+      const url = task.request.url;
+      const html = url.includes('bookclass') ? searchHtml : url.includes('/indexList/') ? pageHtml(2) : url.includes('/indexList-') ? pageHtml(1) : url.includes(`/${chapterId(1)}.html`) ? chapterHtml() : detailHtml;
+      task.finish({ url, html });
+    });
+  });
+  try {
+    const adapter = createLegadoSearchAdapter(source);
+    assert.equal((await adapter.search('罪名不朽'))[0].title, '罪名不朽');
+    assert.equal((await adapter.getBook(bookId)).title, '罪名不朽');
+    assert.equal((await adapter.getChapters(bookId)).length, 101);
+    assert.deepEqual((await adapter.getChapter(bookId, chapterId(1))).paragraphs, ['第一段。', '第二段', '换行。']);
+    assert.equal(directRequests, 1);
+    assert.equal(browserRequests.length, 5);
+    assert.ok(browserRequests.every(request => request.source === 'washai'));
+    assert.equal(browserRequests[0].selector, '#bookList');
+    assert.equal(browserRequests.at(-1).selector, '#readPageBootstrap');
+  } finally { unsubscribe(); }
+});
+
+test('washai verification supports cancellation and rejects a stale page from another search', async () => {
+  const transport = createWashaiTransport(async () => new Response('<title>Just a moment...</title>', { status: 200 }));
+  const request = { url: 'https://book.washai.net/book/bookclass.html?k=test', init: { method: 'GET', headers: {}, credentials: 'omit' } };
+  const controller = new AbortController();
+  let pending = transport(request, controller.signal);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(currentBrowserTask().request.source, 'washai');
+  controller.abort();
+  await assert.rejects(pending, { name: 'AbortError' });
+  assert.equal(currentBrowserTask(), null);
+  pending = transport(request, new AbortController().signal);
+  currentBrowserTask().finish({ url: request.url.replace('k=test', 'k=wrong'), html: searchHtml });
+  await assert.rejects(pending, /不匹配/);
+  assert.equal(washaiPageRequest('https://book.washai.net.evil.test/book/123.html'), undefined);
+});
+
+test('washai plain HTTP errors remain errors and never produce invented successful search data', async () => {
+  const transport = createWashaiTransport(async () => new Response('Forbidden', { status: 403 }));
+  const response = await transport({ url: 'https://book.washai.net/book/bookclass.html?k=test', init: { method: 'GET', headers: {}, credentials: 'omit' } }, new AbortController().signal);
+  assert.equal(response.status, 403);
+  assert.equal(response.ok, false);
+  assert.equal(currentBrowserTask(), null);
+});
+
+test('washai public pages with Cloudflare background scripts do not unnecessarily open verification', async () => {
+  const html = searchHtml + '<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>';
+  const transport = createWashaiTransport(async () => new Response(html, { status: 200 }));
+  const response = await transport({ url: 'https://book.washai.net/book/bookclass.html?k=test', init: { method: 'GET', headers: {}, credentials: 'omit' } }, new AbortController().signal);
+  assert.equal(await response.text(), html);
+  assert.equal(currentBrowserTask(), null);
 });
 
 test('washai reader rejects mismatched, incomplete and locked pages', () => {

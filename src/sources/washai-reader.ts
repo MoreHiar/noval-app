@@ -6,7 +6,8 @@ import type { Book, Chapter, ChapterMeta } from '../domain/books';
 import { bookUrlFromId, fetchReadingPage, paragraphsFromHtml } from './reading';
 
 const baseUrl = 'https://book.washai.net';
-const requestTimeout = 45000;
+// A protected page can wait for the reader to complete website verification.
+const requestTimeout = 300000;
 const digits = /^[1-9]\d*$/;
 const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
 const attributes = (node?: AnyNode) => node && 'attribs' in node ? node.attribs : undefined;

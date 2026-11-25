@@ -149,3 +149,20 @@ test('left/right swipes and chapter boundaries agree, including previous chapter
   assert.deepEqual(turnDestination(2, 3, 1, 2, 1), { kind: 'boundary' });
   assert.deepEqual(turnDestination(0, 3, 0, 2, 1), { kind: 'page', index: 1 });
 });
+
+test('reader preferences recover invalid stored values and typography changes retain the reading anchor', () => {
+  const { parseReaderPreferences, DEFAULT_READER_PREFERENCES } = require('../src/reader/preferences.ts');
+  assert.deepEqual(parseReaderPreferences(null), DEFAULT_READER_PREFERENCES);
+  assert.deepEqual(parseReaderPreferences({ fontSize: NaN, lineSpacing: 'wide', animation: 'unknown' }), DEFAULT_READER_PREFERENCES);
+  assert.deepEqual(parseReaderPreferences({ fontSize: 100, lineSpacing: 2.3, animation: 'none' }), { fontSize: 30, lineSpacing: 2.3, animation: 'none' });
+  assert.equal(parseReaderPreferences({ fontSize: -2 }).fontSize, 14);
+  const text = readingText(['这是一段用于验证调整字号和行间距后阅读位置的正文。'.repeat(100)]);
+  const original = paginateText(text, 19, 20);
+  const anchor = original[3].start;
+  for (const [columns, lines] of [[12, 12], [24, 25]]) {
+    const adjusted = paginateText(text, columns, lines);
+    const resumed = adjusted[pageAtOffset(adjusted, anchor)];
+    assert.ok(resumed.start <= anchor && resumed.end > anchor);
+    assert.equal(adjusted.map(page => page.text).join(''), text);
+  }
+});

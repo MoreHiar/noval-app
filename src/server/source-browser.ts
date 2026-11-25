@@ -4,10 +4,10 @@ import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import type { Browser, BrowserContext, Page } from 'playwright';
-import { allowedBrowserUrl, BrowserPageRequest, browserPageReady, snapshotScript } from '../sources/browser-policy';
+import { allowedBrowserUrl, BrowserPageRequest, BrowserSnapshot, browserPagePresentation, browserPageReady, snapshotScript } from '../sources/browser-policy';
 import { isPublicAddress } from './source-fetch';
 
-type Session = { context: BrowserContext; page: Page; request: BrowserPageRequest; used: number; busy: boolean };
+type Session = { context: BrowserContext; page: Page; request: BrowserPageRequest; used: number; started: number; busy: boolean };
 type Runtime = { browser?: Promise<Browser>; sessions: Map<string, Session>; cleanup?: ReturnType<typeof setInterval> };
 const host = globalThis as typeof globalThis & { novalSourceBrowser?: Runtime };
 const runtime: Runtime = host.novalSourceBrowser ??= { sessions: new Map() };
@@ -44,7 +44,7 @@ async function createSession(request: BrowserPageRequest) {
     } catch { await route.abort().catch(() => undefined); }
   });
   const id = randomUUID();
-  const session: Session = { context, page, request, used: Date.now(), busy: false };
+  const session: Session = { context, page, request, used: Date.now(), started: Date.now(), busy: false };
   runtime.sessions.set(id, session);
   return { id, session };
 }
@@ -63,7 +63,7 @@ export async function handleSourceBrowser(request: Request): Promise<Response> {
     let session = runtime.sessions.get(id);
     if (input.action === 'start') {
       const target = input.request as BrowserPageRequest;
-      if (!target || !['linovelib','biquting','bg94'].includes(target.source) || typeof target.url !== 'string' || typeof target.selector !== 'string' || target.selector.length > 1000) throw new Error('书源请求无效。');
+      if (!target || !['linovelib','biquting','bg94','washai'].includes(target.source) || typeof target.url !== 'string' || typeof target.selector !== 'string' || target.selector.length > 1000) throw new Error('书源请求无效。');
       if (session && session.request.source !== target.source) throw new Error('书源会话不匹配。');
       if (!session) ({ id, session } = await createSession(target));
       if (session.busy) throw new Error('网页正在加载，请稍后。');
@@ -77,6 +77,7 @@ export async function handleSourceBrowser(request: Request): Promise<Response> {
       if (input.action === 'close') { runtime.sessions.delete(id); await session.context.close(); return json({ closed: true }); }
       if (input.action === 'start') {
         if (!allowedBrowserUrl(session.request.source, session.request.url)) throw new Error('网页地址不允许。');
+        session.started = Date.now();
         await session.page.goto(session.request.url, { waitUntil: 'domcontentloaded', timeout: 25000 }).catch(error => {
           if (!allowedBrowserUrl(session!.request.source, session!.page.url())) throw new Error('网站连接失败或跳转到了未确认域名。');
           if (!/Timeout/.test(String(error))) throw error;
@@ -96,11 +97,14 @@ export async function handleSourceBrowser(request: Request): Promise<Response> {
       } else if (input.action !== 'snapshot') throw new Error('操作无效。');
       const url = session.page.url();
       if (!allowedBrowserUrl(session.request.source,url)) throw new Error('网页已离开书源网站。');
-      const snapshot = await session.page.evaluate(snapshotScript(session.request.selector)) as {title:string;found:boolean;text:string;html:string;url:string};
+      const snapshot = await session.page.evaluate(snapshotScript(session.request.selector)) as BrowserSnapshot;
       if (snapshot.html.length > 5*1024*1024) throw new Error('网页内容超过 5 MB。');
-      if (browserPageReady(snapshot.title,snapshot.found,snapshot.text)) return json({ id, ready: true, url, html: snapshot.html });
+      const presentation = browserPagePresentation(snapshot, Date.now() - session.started);
+      const ready = session.request.source === 'washai' ? presentation === 'ready' : browserPageReady(snapshot.title,snapshot.found,snapshot.text);
+      if (ready) return json({ id, ready: true, url, html: snapshot.html });
+      if (session.request.source === 'washai' && presentation === 'background') return json({ id, ready: false, needsInteraction: false, url });
       const screenshot = (await session.page.screenshot({ type: 'jpeg', quality: 65, timeout: 5000 })).toString('base64');
-      return json({ id, ready: false, url, title: snapshot.title, screenshot });
+      return json({ id, ready: false, needsInteraction: true, url, title: snapshot.title, screenshot });
     } finally { session.busy = false; }
   } catch (error) {
     const message = error instanceof Error ? error.message : '网页加载失败。';

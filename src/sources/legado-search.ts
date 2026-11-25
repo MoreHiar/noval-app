@@ -10,6 +10,7 @@ import { isFanqieSourceId } from './fanqie';
 import { createFanqieReader } from './reading';
 import { createJgwxsReader } from './jgwxs-reader';
 import { createWashaiReader } from './washai-reader';
+import { BQG349_URL, createBqg349Reader } from './bqg349-reader';
 import { browserSearch, browserSearchRules } from './browser-search';
 import { loadBrowserPage } from './browser-session';
 import { createQidianReader } from './qidian-reader';
@@ -134,7 +135,7 @@ function aborted(): Error {
 export function createLegadoSearchAdapter(document: RuleSourceDocument, getSavedBook?: (bookId: string) => Promise<Book | null>): SourceAdapter {
   const sourceId = ruleSourceId(document);
   const sourceUrl = document.bookSourceUrl.trim().replace(/\/$/, '');
-  const reader = isFanqieSourceId(sourceId) ? createFanqieReader(sourceId) : sourceUrl === 'https://www.jgwxs.com' ? createJgwxsReader(sourceId) : sourceUrl === 'https://book.washai.net' ? createWashaiReader(sourceId) : isLegacyQidianSearch(document) ? createQidianReader(sourceId) : browserSearch(document,'test') ? createBrowserReader(document) : undefined;
+  const reader = isFanqieSourceId(sourceId) ? createFanqieReader(sourceId) : sourceUrl === 'https://www.jgwxs.com' ? createJgwxsReader(sourceId) : sourceUrl === 'https://book.washai.net' ? createWashaiReader(sourceId) : sourceUrl === BQG349_URL ? createBqg349Reader(sourceId) : isLegacyQidianSearch(document) ? createQidianReader(sourceId) : browserSearch(document,'test') ? createBrowserReader(document) : undefined;
   const cache = new Map<string, Book>();
   let compiled: ReturnType<typeof compileSearch> | undefined;
   let searchUnavailableReason: string | undefined;
@@ -152,7 +153,7 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument, getSaved
       signal?.addEventListener('abort', cancel);
       let timedOut = false;
       const browser = browserSearch(document,query.trim());
-      const timer = setTimeout(() => { timedOut = true; cancel(); }, browser ? 300000 : sourceUrl === 'https://book.washai.net' ? 45000 : TIMEOUT_MS);
+      const timer = setTimeout(() => { timedOut = true; cancel(); }, browser || sourceUrl === 'https://book.washai.net' ? 300000 : TIMEOUT_MS);
       try {
         const request = browser ? buildSearchRequest(document,query.trim()) : await resolveSearchRequest(document, query.trim(), controller.signal);
         controller.signal.throwIfAborted();

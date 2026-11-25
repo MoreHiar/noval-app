@@ -1,4 +1,5 @@
 import type { RuleSourceDocument } from '../domain/books';
+import { BQG349_URL, bqg349CoverUrl } from './bqg349-reader';
 
 export function isLegacyQidianSearch(document: RuleSourceDocument): boolean {
   return document.bookSourceUrl === 'https://m.qidian.com' &&
@@ -57,6 +58,12 @@ export function searchRulesFor(document: RuleSourceDocument): Record<string, unk
 }
 
 export function knownSearchCover(document: RuleSourceDocument, bookUrl: string): string | undefined {
+  if (document.bookSourceUrl.replace(/\/$/, '') === BQG349_URL) {
+    const url = new URL(bookUrl);
+    const number = url.hash.match(/^#\/book\/([1-9]\d*)\/?$/)?.[1];
+    if (url.origin === BQG349_URL && number && Number.isSafeInteger(Number(number))) return bqg349CoverUrl(number);
+    return;
+  }
   // The list omits artwork; the original source script uses this same image path.
   if (!hasLegacySuduguRules(document)) return;
   const url = new URL(bookUrl);

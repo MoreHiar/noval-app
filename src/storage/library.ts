@@ -3,11 +3,11 @@ import { openDatabaseAsync } from 'expo-sqlite';
 import type { LibraryData } from '../sources/management';
 import type { Book, ReadingProgress } from '../domain/books';
 import { createLibraryDatabase, LEGACY_LIBRARY_KEY } from './library-database';
-import { jgwxsDefaultBundle, washaiDefaultBundle } from '../sources/defaults';
+import { bqg349DefaultBundle, jgwxsDefaultBundle, washaiDefaultBundle } from '../sources/defaults';
 
 let repository: ReturnType<typeof createLibraryDatabase> | undefined;
 function getRepository() {
-  repository ??= openDatabaseAsync('noval-library.db').then(db => createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle, additionalDefaultBundles: [washaiDefaultBundle] })).catch(error => {
+  repository ??= openDatabaseAsync('noval-library.db').then(db => createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle, additionalDefaultBundles: [washaiDefaultBundle, bqg349DefaultBundle] })).catch(error => {
     repository = undefined;
     throw error;
   });

@@ -3,6 +3,8 @@ import { browserSource } from './browser-policy';
 
 export function browserSearch(document: RuleSourceDocument, keyword: string) {
   const source = browserSource(document.bookSourceUrl);
+  // Washai uses direct requests until its transport detects a verification page.
+  if (source === 'washai') return undefined;
   if (!source || document.bookSourceType && document.bookSourceType !== 0) return undefined;
   const query = encodeURIComponent(keyword);
   if (source === 'linovelib') return { source, name: document.bookSourceName, url:`https://w.linovelib.com/search.html?searchkey=${query}&searchtype=all`, selector:'.book-ol li, .book-list li, .book-cell', purpose:'搜索与验证' };

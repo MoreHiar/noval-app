@@ -16,7 +16,7 @@ const { definitionId } = require('../src/sources/legado.ts');
 const { createLegadoSearchAdapter } = require('../src/sources/legado-search.ts');
 const { bookKey, deleteDefinition, deleteRuleSources, getShelfBooks, mergeSources, parseLibraryData, saveDefinition, setAllRuleSourcesEnabled, setShelfBook } = require('../src/sources/management.ts');
 const { createLibraryDatabase } = require('../src/storage/library-database.ts');
-const { jgwxsDefaultBundle, washaiDefaultBundle } = require('../src/sources/defaults.ts');
+const { bqg349DefaultBundle, jgwxsDefaultBundle, washaiDefaultBundle } = require('../src/sources/defaults.ts');
 
 
 const initial = () => ({ version: 1, definitions: [fanqieSource(), { kind: 'javascript', enabled: true, document: javascriptDocument }], shelf: ['js-example/clock'] });
@@ -287,6 +287,30 @@ test('fresh install registers both built-in sources once', async t => {
   assert.deepEqual(loaded.definitions.map(entry => entry.document.bookSourceName), ['甲骨文小说', '书海阁']);
   assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count, 2);
   assert.deepEqual((await store.load(empty, forbiddenLegacy)).definitions, loaded.definitions);
+});
+
+test('bqg349 installs once into existing libraries and does not restore previously deleted sources', async t => {
+  const { db, raw } = await database(t);
+  const empty = { version: 1, definitions: [], shelf: [] };
+  const old = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle, additionalDefaultBundles: [washaiDefaultBundle] });
+  let data = await old.load(empty, noLegacy);
+  data = deleteDefinition(data, definitionId(jgwxsDefaultBundle.sources[0]));
+  await old.save(data);
+  const upgraded = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle, additionalDefaultBundles: [washaiDefaultBundle, bqg349DefaultBundle] });
+  const loaded = await upgraded.load(empty, forbiddenLegacy);
+  assert.deepEqual(loaded.definitions.map(entry => entry.document.bookSourceName), ['书海阁', '笔趣阁349']);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count, 3);
+  assert.deepEqual((await upgraded.load(empty, forbiddenLegacy)).definitions, loaded.definitions);
+  await upgraded.save(deleteDefinition(loaded, definitionId(bqg349DefaultBundle.sources[0])));
+  assert.deepEqual((await upgraded.load(empty, forbiddenLegacy)).definitions.map(entry => entry.document.bookSourceName), ['书海阁']);
+});
+
+test('bqg349 default installation preserves an existing custom definition', async t => {
+  const { db, store } = await database(t);
+  const custom = { ...bqg349DefaultBundle.sources[0], enabled: false, document: { ...bqg349DefaultBundle.sources[0].document, bookSourceName: '我的笔趣阁', enabled: false } };
+  await store.load({ version: 1, definitions: [custom], shelf: [] }, noLegacy);
+  const upgraded = await createLibraryDatabase(db, { additionalDefaultBundles: [bqg349DefaultBundle] });
+  assert.deepEqual((await upgraded.load(initial(), forbiddenLegacy)).definitions, [custom]);
 });
 
 test('failed built-in source installation rolls back its definition and marker', async t => {

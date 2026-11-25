@@ -1,0 +1,30 @@
+{
+  "bookSourceName": "笔趣阁349",
+  "bookSourceUrl": "https://www.bqg349.xyz",
+  "bookSourceType": 0,
+  "bookSourceGroup": "内置",
+  "bookSourceComment": "笔趣阁349公开搜索接口；Noval已适配书籍详情、完整目录及正文请求。",
+  "enabled": true,
+  "enabledExplore": false,
+  "searchUrl": "/api/search?q={{key}}",
+  "ruleSearch": {
+    "bookList": "$.data",
+    "name": "$.title",
+    "author": "$.author",
+    "intro": "$.intro",
+    "bookUrl": "$.id##^([1-9][0-9]*)$##https://www.bqg349.xyz/#/book/$1/"
+  },
+  "ruleBookInfo": {
+    "name": "#title@text",
+    "author": "#author@text##^作者：",
+    "intro": "#intro@text"
+  },
+  "ruleToc": {
+    "chapterList": "#list dd a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "ruleContent": {
+    "content": "#chaptercontent@html"
+  }
+}

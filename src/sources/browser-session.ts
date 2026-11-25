@@ -1,12 +1,20 @@
-import { allowedBrowserUrl, BrowserPage, BrowserPageRequest } from './browser-policy';
+import { allowedBrowserUrl, browserPageMatches, BrowserPage, BrowserPageRequest, BrowserSource } from './browser-policy';
 
 export type BrowserTask = { id: number; request: BrowserPageRequest; finish(page: BrowserPage): void; fail(error: Error): void };
+export type BrowserSessionRequest = Pick<BrowserTask, 'id' | 'request'>;
 let tasks: BrowserTask[] = [];
 let sequence = 0;
 const listeners = new Set<() => void>();
-const changed = () => listeners.forEach(listener => listener());
+const latestRequests = new Map<BrowserSource, BrowserSessionRequest>();
+const changed = () => {
+  const active = tasks[0];
+  if (active && latestRequests.get(active.request.source)?.id !== active.id) latestRequests.set(active.request.source, { id: active.id, request: active.request });
+  listeners.forEach(listener => listener());
+};
 export const subscribeBrowser = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const currentBrowserTask = () => tasks[0] ?? null;
+// Retain only request metadata so native WebViews can stay mounted between tasks.
+export const latestBrowserRequest = (source: BrowserSource) => latestRequests.get(source) ?? null;
 
 export function loadBrowserPage(request: BrowserPageRequest, signal?: AbortSignal): Promise<BrowserPage> {
   if (!allowedBrowserUrl(request.source, request.url)) return Promise.reject(new Error('书源浏览器地址不在已确认的网站范围内。'));
@@ -22,6 +30,7 @@ export function loadBrowserPage(request: BrowserPageRequest, signal?: AbortSigna
     const timer = setTimeout(() => done(new Error('网页验证等待超时，请重新搜索或重试。')), 300000);
     tasks = [...tasks, { id, request, finish: page => {
       if (!allowedBrowserUrl(request.source, page.url) || page.html.length > 5 * 1024 * 1024) return done(new Error('网页地址或内容大小无效。'));
+      if (request.source === 'washai' && !browserPageMatches(request, page.url)) return done(new Error('书海阁返回的页面与请求不匹配，请重试。'));
       done(undefined, page);
     }, fail: error => done(error) }];
     signal?.addEventListener('abort', abort, { once: true }); changed();

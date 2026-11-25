@@ -11,7 +11,7 @@ export default function RootLayout() {
         <Stack.Screen name="source/edit" options={{ title: '书源信息' }} />
         <Stack.Screen name="source/import" options={{ title: '导入书源' }} />
         <Stack.Screen name="book/[sourceId]/[bookId]" options={{ title: '书籍详情' }} />
-        <Stack.Screen name="reader/[sourceId]/[bookId]/[chapterId]" options={{ title: '阅读', gestureEnabled: false, animation: 'none' }} />
+        <Stack.Screen name="reader/[sourceId]/[bookId]/[chapterId]" options={{ headerShown: false, gestureEnabled: false, animation: 'none' }} />
       </Stack>
       <SourceBrowser />
     </LibraryProvider>

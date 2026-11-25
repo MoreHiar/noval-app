@@ -16,6 +16,7 @@ const sourceHosts = new Set([
   'm.qidian.com', 'www.yuyouku.com',
   'v1.gyks.cf',
   'www.jgwxs.com', 'book.washai.net',
+  'www.bqg349.xyz',
   // Exact public sites in the user-selected Yiove default collection.
   'm.cuoceng.org', 'm.jhssd.com', 'm.libahao.com', 'm.powenwu16.com', 'www.20xs.org',
   'www.38xs.com', 'www.biquge7.top', 'www.biquges123.com', 'www.biqusa.com', 'www.kanshuw.com',
