@@ -16,13 +16,13 @@ export function bookUrlFromId(id: string): URL {
   return url;
 }
 
-export async function fetchReadingPage(url: string, signal?: AbortSignal): Promise<string> {
+export async function fetchReadingPage(url: string, signal?: AbortSignal, timeoutMs = 20000): Promise<string> {
   const controller = new AbortController();
   const cancel = () => controller.abort();
   signal?.addEventListener('abort', cancel, { once: true });
   if (signal?.aborted) cancel();
   let timedOut = false;
-  const timer = setTimeout(() => { timedOut = true; cancel(); }, 20000);
+  const timer = setTimeout(() => { timedOut = true; cancel(); }, timeoutMs);
   try {
     const response = await fetchSearchResponse({ url, init: { method: 'GET', headers: {}, credentials: 'omit' } }, controller.signal);
     if (!response.ok) throw new Error(`书源返回 HTTP ${response.status}，请稍后重试。`);

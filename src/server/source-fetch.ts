@@ -15,7 +15,7 @@ const sourceHosts = new Set([
   'novel.snssdk.com', 'fanqienovel.com',
   'm.qidian.com', 'www.yuyouku.com',
   'v1.gyks.cf',
-  'www.jgwxs.com',
+  'www.jgwxs.com', 'book.washai.net',
   // Exact public sites in the user-selected Yiove default collection.
   'm.cuoceng.org', 'm.jhssd.com', 'm.libahao.com', 'm.powenwu16.com', 'www.20xs.org',
   'www.38xs.com', 'www.biquge7.top', 'www.biquges123.com', 'www.biqusa.com', 'www.kanshuw.com',
@@ -123,7 +123,7 @@ export async function handleSourceFetch(request: Request): Promise<Response> {
   const controller = new AbortController();
   const cancel = () => controller.abort();
   let timedOut = false;
-  const timer = setTimeout(() => { timedOut = true; cancel(); }, 18000);
+  let timer: ReturnType<typeof setTimeout> | undefined;
   request.signal.addEventListener('abort', cancel, { once: true });
   if (request.signal.aborted) cancel();
   try {
@@ -131,8 +131,10 @@ export async function handleSourceFetch(request: Request): Promise<Response> {
     if (text.length > 65536) return json({ error: '书源请求参数过大。' }, 413);
     const raw = JSON.parse(text);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw) || typeof raw.url !== 'string' || !['GET', 'POST'].includes(raw.method) || (raw.body !== undefined && (typeof raw.body !== 'string' || raw.method !== 'POST'))) return json({ error: '书源请求参数无效。' }, 400);
-    try { validateSourceTarget(raw.url); }
+    let target: URL;
+    try { target = validateSourceTarget(raw.url); }
     catch (cause) { return json({ error: (cause as Error).message }, 403); }
+    timer = setTimeout(() => { timedOut = true; cancel(); }, target.hostname === 'book.washai.net' ? 43000 : 18000);
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(raw.headers ?? {})) {
       if (/^(accept|accept-language|content-type|user-agent|referer)$/i.test(key) && typeof value === 'string' && !/[\r\n]/.test(value)) headers[key] = value;

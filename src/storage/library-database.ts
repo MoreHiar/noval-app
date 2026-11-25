@@ -8,7 +8,9 @@ type ShelfRow = { source_id: string; book_id: string; position: number; metadata
 
 export const LEGACY_LIBRARY_KEY = 'noval.library.v1';
 
-export async function createLibraryDatabase(db: Database, options: { defaultBundle?: { id: string; sources: RuleManagedSource[] } } = {}) {
+type DefaultBundle = { id: string; sources: RuleManagedSource[] };
+
+export async function createLibraryDatabase(db: Database, options: { defaultBundle?: DefaultBundle; additionalDefaultBundles?: DefaultBundle[] } = {}) {
   const schema = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   if (schema && schema.user_version > 5) throw new Error('本地数据库由更新版本创建，请更新应用。');
   await db.execAsync(`
@@ -75,11 +77,13 @@ export async function createLibraryDatabase(db: Database, options: { defaultBund
 
   async function prepareLibrary(current: LibraryData, initialize = false): Promise<LibraryData> {
     if (initialize) await write(current);
-    const bundle = options.defaultBundle;
-    if (!bundle || await db.getFirstAsync('SELECT id FROM default_source_bundles WHERE id = ?', bundle.id)) return current;
-    const next = mergeSources(current, bundle.sources, false).data;
-    await write(next);
-    await db.runAsync('INSERT INTO default_source_bundles (id) VALUES (?)', bundle.id);
+    let next = current;
+    for (const bundle of [options.defaultBundle, ...(options.additionalDefaultBundles ?? [])]) {
+      if (!bundle || await db.getFirstAsync('SELECT id FROM default_source_bundles WHERE id = ?', bundle.id)) continue;
+      next = mergeSources(next, bundle.sources, false).data;
+      await write(next);
+      await db.runAsync('INSERT INTO default_source_bundles (id) VALUES (?)', bundle.id);
+    }
     return next;
   }
 

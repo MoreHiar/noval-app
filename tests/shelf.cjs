@@ -16,7 +16,7 @@ const { definitionId } = require('../src/sources/legado.ts');
 const { createLegadoSearchAdapter } = require('../src/sources/legado-search.ts');
 const { bookKey, deleteDefinition, deleteRuleSources, getShelfBooks, mergeSources, parseLibraryData, saveDefinition, setAllRuleSourcesEnabled, setShelfBook } = require('../src/sources/management.ts');
 const { createLibraryDatabase } = require('../src/storage/library-database.ts');
-const { jgwxsDefaultBundle } = require('../src/sources/defaults.ts');
+const { jgwxsDefaultBundle, washaiDefaultBundle } = require('../src/sources/defaults.ts');
 
 
 const initial = () => ({ version: 1, definitions: [fanqieSource(), { kind: 'javascript', enabled: true, document: javascriptDocument }], shelf: ['js-example/clock'] });
@@ -264,6 +264,29 @@ test('built-in Jgwxs keeps an existing same-address custom source', async t => {
   const upgraded = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle });
   const result = await upgraded.load({ version: 1, definitions: [], shelf: [] }, forbiddenLegacy);
   assert.deepEqual(result.definitions, [custom]);
+});
+
+test('installing Washai keeps a previously deleted Jgwxs source deleted', async t => {
+  const { db, raw } = await database(t);
+  const empty = { version: 1, definitions: [], shelf: [] };
+  const first = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle });
+  const installed = await first.load(empty, noLegacy);
+  await first.save(deleteDefinition(installed, definitionId(jgwxsDefaultBundle.sources[0])));
+  const upgraded = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle, additionalDefaultBundles: [washaiDefaultBundle] });
+  const result = await upgraded.load(empty, forbiddenLegacy);
+  assert.deepEqual(result.definitions.map(entry => entry.document.bookSourceName), ['书海阁']);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count, 2);
+  assert.deepEqual((await upgraded.load(empty, forbiddenLegacy)).definitions, result.definitions);
+});
+
+test('fresh install registers both built-in sources once', async t => {
+  const { db, raw } = await database(t);
+  const empty = { version: 1, definitions: [], shelf: [] };
+  const store = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle, additionalDefaultBundles: [washaiDefaultBundle] });
+  const loaded = await store.load(empty, noLegacy);
+  assert.deepEqual(loaded.definitions.map(entry => entry.document.bookSourceName), ['甲骨文小说', '书海阁']);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count, 2);
+  assert.deepEqual((await store.load(empty, forbiddenLegacy)).definitions, loaded.definitions);
 });
 
 test('failed built-in source installation rolls back its definition and marker', async t => {

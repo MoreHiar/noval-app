@@ -1,0 +1,34 @@
+{
+  "bookSourceName": "书海阁",
+  "bookSourceUrl": "https://book.washai.net",
+  "bookSourceType": 0,
+  "bookSourceGroup": "自定义",
+  "bookSourceComment": "书海阁公开搜索、目录与章节；目录按页加载。",
+  "enabled": true,
+  "enabledExplore": false,
+  "searchUrl": "/book/bookclass.html?k={{key}}",
+  "ruleSearch": {
+    "bookList": "#bookList .classBookCard",
+    "name": ".classBookTitle a@text",
+    "author": ".classBookAuthor a@text",
+    "intro": ".classBookDesc@text",
+    "kind": ".book-cover-badge@text",
+    "bookUrl": ".classBookTitle a@href",
+    "coverUrl": ".classBookCover img@src"
+  },
+  "ruleBookInfo": {
+    "name": "#bookName@text",
+    "author": "#bookAuthor@text",
+    "intro": "#bookDesc@text",
+    "tocUrl": "#allIndexLink@href"
+  },
+  "ruleToc": {
+    "chapterList": "#bookIndexList li[data-index-id]",
+    "chapterName": "a@ownText",
+    "chapterUrl": "a@href",
+    "nextTocUrl": "#indexPager a.pgBtn@href"
+  },
+  "ruleContent": {
+    "content": "#showReading .readChapterPrimaryBlock .readChapterAppendBody@html"
+  }
+}

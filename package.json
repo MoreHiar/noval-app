@@ -51,7 +51,7 @@
     "test:search": "node --test tests/search.cjs tests/source-relay.cjs",
     "test:sources": "node --test tests/management.cjs",
     "test:shelf": "node --test tests/shelf.cjs",
-    "test:reading": "node --test tests/reading.cjs tests/browser.cjs"
+    "test:reading": "node --test tests/reading.cjs tests/browser.cjs tests/washai.cjs"
   },
   "private": true
 }

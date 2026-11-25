@@ -19,6 +19,7 @@ test('relay only accepts configured exact hosts, normal web ports and public DNS
   assert.equal(validateSourceTarget('https://m.qidian.com/so/test.html').hostname, 'm.qidian.com');
   assert.equal(validateSourceTarget('https://www.yuyouku.com/search').hostname, 'www.yuyouku.com');
   assert.equal(validateSourceTarget('https://v1.gyks.cf/search').hostname, 'v1.gyks.cf');
+  assert.equal(validateSourceTarget('https://book.washai.net/book/bookclass.html?k=test').hostname, 'book.washai.net');
   for (const url of ['http://127.0.0.1', 'http://169.254.169.254', 'file:///etc/passwd', 'https://appi.kuwo.cn.evil.test', 'https://appi.kuwo.cn:1234', 'https://user:secret@appi.kuwo.cn', 'http://[::1]']) assert.throws(() => validateSourceTarget(url));
   for (const address of ['127.0.0.1', '10.0.0.1', '192.168.1.2', '169.254.169.254', '100.64.0.2', '::1', '::ffff:127.0.0.1', 'fe80::1', 'fc00::1']) assert.equal(isPublicAddress(address), false, address);
   assert.equal(isPublicAddress('8.8.8.8'), true);
