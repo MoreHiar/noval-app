@@ -12,8 +12,34 @@ const bookPage = { bookId: '123456', bookName: '测试书籍', author: '作者',
 const chapterPage = { common: {}, reader: { chapterData: { bookId: '123456', itemId: '11', title: '第一章', content: '<p>第一段。</p><p>第二段 &amp; 文字<br>换行</p>' } } };
 const { parseQidianCatalog,parseQidianChapter,createQidianReader }=require('../src/sources/qidian-reader.ts');
 const {urlBookId,createBrowserReader}=require('../src/sources/browser-reader.ts');
+const { createLegadoSearchAdapter } = require('../src/sources/legado-search.ts');
+const { parseJgwxsBook, parseJgwxsChapter } = require('../src/sources/jgwxs-reader.ts');
+const jgwxsSource = JSON.parse(fs.readFileSync(require('node:path').join(__dirname, '../docs/sources/jgwxs.json'), 'utf8'));
+const jgwxsId = urlBookId('https://www.jgwxs.com/novel/177171');
+const jgwxsHtml = data => `<script>window.__INITIAL_STATE__=${JSON.stringify({ app: { data } })};</script>`;
 const qidianId=urlBookId('https://m.qidian.com/book/123.html');
 const qidianHtml=data=>`<script id="vite-plugin-ssr_pageContext" type="application/json">${JSON.stringify({pageContext:{pageProps:{pageData:data}}})}</script>`;
+
+test('Jgwxs source searches and reads its catalog and chapter', async t => {
+  const bookPage = jgwxsHtml({ novel: { id: 177171, name: '夜无疆', authName: '辰东', synopsis: '简介', cover: 'cover.jpg', end: false }, index: [{ page: 2, title: '第二章' }, { page: 1, title: '第一章' }] });
+  const chapterPage = jgwxsHtml({ chapter: { novelId: 177171, page: 1, title: '第一章', content: '第一段\n第二段' } });
+  const requested = [];
+  t.mock.method(globalThis, 'fetch', async url => {
+    requested.push(String(url));
+    return new Response(String(url).includes('/novel/search') ? JSON.stringify({ data: { res: { records: new URL(String(url)).searchParams.get('keyword') === '无结果' ? [] : [{ id: 177171, name: '夜无疆', authName: '辰东', synopsis: '简介', cover: 'cover.jpg' }] } } }) : String(url).includes('/chapter/') ? chapterPage : bookPage);
+  });
+  const adapter = createLegadoSearchAdapter(jgwxsSource);
+  const results = await adapter.search('夜无疆');
+  assert.equal(results[0].id, jgwxsId);
+  assert.equal(results[0].coverUrl, 'https://static.ttkan.co/cover/cover.jpg');
+  assert.equal((await adapter.getBook(jgwxsId)).title, '夜无疆');
+  assert.deepEqual((await adapter.getChapters(jgwxsId)).map(x => x.id), ['1', '2']);
+  assert.deepEqual((await adapter.getChapter(jgwxsId, '1')).paragraphs, ['第一段', '第二段']);
+  assert.equal(requested.length, 3);
+  assert.deepEqual(await adapter.search('无结果'), []);
+  assert.throws(() => parseJgwxsBook(jgwxsHtml({ novel: { id: 99, name: '错书' }, index: [{ page: 1, title: '第一章' }] }), 'source', jgwxsId), /不匹配/);
+  assert.throws(() => parseJgwxsChapter(jgwxsHtml({ chapter: { novelId: 99, page: 1, content: '正文' } }), jgwxsId, '1'), /不匹配/);
+});
 
 test('Qidian volumes preserve chapter order, lock state and book identity instead of returning zero',()=>{
   const html=qidianHtml({bookId:123,vs:[{vN:'第一卷',cCnt:2,vS:0,cs:[{id:10,cN:'第一章',sS:1},{id:11,cN:'第二章',sS:1}]},{vN:'VIP',cCnt:1,vS:1,cs:[{id:12,cN:'第三章',sS:0}]}]});

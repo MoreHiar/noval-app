@@ -1,0 +1,30 @@
+{
+  "bookSourceName": "甲骨文小说",
+  "bookSourceUrl": "https://www.jgwxs.com",
+  "bookSourceType": 0,
+  "bookSourceGroup": "自定义",
+  "bookSourceComment": "甲骨文小说公开搜索、目录与章节。",
+  "enabled": true,
+  "enabledExplore": false,
+  "searchUrl": "/jgw-novel/novel/search?keyword={{key}}&page={{page}}",
+  "ruleSearch": {
+    "bookList": "$.data.res.records",
+    "name": "$.name",
+    "author": "$.authName",
+    "intro": "$.synopsis",
+    "bookUrl": "$.id##^([0-9]+)$##https://www.jgwxs.com/novel/$1",
+    "coverUrl": "$.cover##^(.+)$##https://static.ttkan.co/cover/$1"
+  },
+  "ruleBookInfo": {
+    "name": "h1@text",
+    "author": "article p.ahp.0@text##^作者：##"
+  },
+  "ruleToc": {
+    "chapterList": "article a[href^='/chapter/']!0",
+    "chapterName": "text",
+    "chapterUrl": "href"
+  },
+  "ruleContent": {
+    "content": "article p@text"
+  }
+}

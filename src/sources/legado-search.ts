@@ -8,6 +8,7 @@ import { fetchSearchResponse } from './search-transport';
 import { isLegacyQidianSearch, isLegacySuduguSearch, isYuyoukuFormSearch, knownSearchCover, searchRulesFor } from './search-compat';
 import { isFanqieSourceId } from './fanqie';
 import { createFanqieReader } from './reading';
+import { createJgwxsReader } from './jgwxs-reader';
 import { browserSearch, browserSearchRules } from './browser-search';
 import { loadBrowserPage } from './browser-session';
 import { createQidianReader } from './qidian-reader';
@@ -128,7 +129,7 @@ function aborted(): Error {
 
 export function createLegadoSearchAdapter(document: RuleSourceDocument, getSavedBook?: (bookId: string) => Promise<Book | null>): SourceAdapter {
   const sourceId = ruleSourceId(document);
-  const reader = isFanqieSourceId(sourceId) ? createFanqieReader(sourceId) : isLegacyQidianSearch(document) ? createQidianReader(sourceId) : browserSearch(document,'test') ? createBrowserReader(document) : undefined;
+  const reader = isFanqieSourceId(sourceId) ? createFanqieReader(sourceId) : document.bookSourceUrl.trim().replace(/\/$/, '') === 'https://www.jgwxs.com' ? createJgwxsReader(sourceId) : isLegacyQidianSearch(document) ? createQidianReader(sourceId) : browserSearch(document,'test') ? createBrowserReader(document) : undefined;
   const cache = new Map<string, Book>();
   let compiled: ReturnType<typeof compileSearch> | undefined;
   let searchUnavailableReason: string | undefined;

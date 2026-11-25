@@ -44,7 +44,7 @@ export async function fetchReadingPage(url: string, signal?: AbortSignal): Promi
 }
 
 // Read the public JSON hydration payload as data; never execute a website's scripts.
-export function parseFanqieState(html: string): Record<string, unknown> {
+export function parseInitialState(html: string, siteName: string): Record<string, unknown> {
   const scripts = selectAll('script', parseDocument(html));
   for (const script of scripts) {
     const text = textContent(script);
@@ -63,14 +63,16 @@ export function parseFanqieState(html: string): Record<string, unknown> {
       else if (char === '}' && --depth === 0) {
         let value: unknown;
         try { value = JSON.parse(text.slice(start, index + 1)); }
-        catch { throw new Error('番茄页面数据格式已变化，请稍后重试。'); }
+        catch { throw new Error(`${siteName}页面数据格式已变化，请稍后重试。`); }
         if (record(value)) return value;
         break;
       }
     }
   }
-  throw new Error('番茄未返回可解析内容，可能需要网站验证或该书已下架。');
+  throw new Error(`${siteName}未返回可解析内容，可能需要网站验证或该书已下架。`);
 }
+
+export const parseFanqieState = (html: string) => parseInitialState(html, '番茄');
 
 export function fanqieBookNumber(bookId: string): string {
   const url = bookUrlFromId(bookId);
