@@ -257,7 +257,23 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument, getSaved
         signal?.removeEventListener('abort', cancel);
       }
     },
-    async getBook(bookId, signal) { return reader && reader !== ruleReader && !isFanqieSourceId(sourceId) ? reader.getBook(bookId,signal) : cache.get(bookId) ?? (await getSavedBook?.(bookId)) ?? (reader ? reader.getBook(bookId, signal) : null); },
+    async getBook(bookId, signal) {
+      if (reader && reader !== ruleReader && !isFanqieSourceId(sourceId)) return reader.getBook(bookId, signal);
+      const snapshot = cache.get(bookId) ?? (await getSavedBook?.(bookId));
+      if (document.bookSourceType === 2 && ruleReader && reader === ruleReader) {
+        try {
+          const details = await ruleReader.getBook(bookId, signal);
+          if (details) {
+            const book = { ...snapshot, ...details, category: snapshot?.category ?? details.category };
+            cache.set(bookId, book);
+            return book;
+          }
+        } catch (error) {
+          if (!snapshot || signal?.aborted) throw error;
+        }
+      }
+      return snapshot ?? (reader ? reader.getBook(bookId, signal) : null);
+    },
     async getChapters(bookId, signal) { return reader ? reader.getChapters(bookId, signal) : []; },
     async getChapter(bookId, chapterId, signal) { return reader ? reader.getChapter(bookId, chapterId, signal) : null; },
   };

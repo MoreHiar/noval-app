@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { Book } from '../domain/books';
+import { RemoteImage } from './RemoteImage';
 
 export function BookCover({ book, large = false, style }: { book: Book; large?: boolean; style?: StyleProp<ViewStyle> }) {
   const [failed, setFailed] = useState<{ key: string; urls: string[] }>({ key: '', urls: [] });
@@ -12,7 +13,7 @@ export function BookCover({ book, large = false, style }: { book: Book; large?: 
   return (
     <View style={[styles.cover, large && styles.large, { backgroundColor: book.accent }, style]}>
       {showImage ? (
-        <Image key={uri} source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`${book.title}封面`} onError={() => setFailed(current => ({ key, urls: [...(current.key === key ? current.urls : []), uri] }))} />
+        <RemoteImage key={uri} uri={uri} style={StyleSheet.absoluteFill} accessibilityLabel={`${book.title}封面`} onError={() => setFailed(current => ({ key, urls: [...(current.key === key ? current.urls : []), uri] }))} />
       ) : (
         <>
           <Text style={styles.series}>NOVAL / STORIES</Text>

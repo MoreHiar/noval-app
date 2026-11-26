@@ -1,6 +1,7 @@
 import document from '../../docs/sources/jgwxs.json';
 import washaiDocument from '../../docs/sources/washai.json';
 import bqg349Document from '../../docs/sources/bqg349.json';
+import guazimanhuaDocument from '../../docs/sources/guazimanhua.json';
 import type { RuleManagedSource } from '../domain/books';
 import { parseRuleSource } from './legado';
 
@@ -20,4 +21,9 @@ export const washaiDefaultBundle: { id: string; sources: RuleManagedSource[] } =
 export const bqg349DefaultBundle: { id: string; sources: RuleManagedSource[] } = {
   id: 'bqg349-2026-11-25-v1',
   sources: [{ kind: 'legado', document: parseRuleSource(bqg349Document), enabled: true }],
+};
+
+export const guazimanhuaDefaultBundle: { id: string; sources: RuleManagedSource[] } = {
+  id: 'guazimanhua-2026-11-26-v1',
+  sources: [{ kind: 'legado', document: parseRuleSource(guazimanhuaDocument), enabled: true }],
 };

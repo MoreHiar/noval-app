@@ -16,7 +16,7 @@ const { definitionId } = require('../src/sources/legado.ts');
 const { createLegadoSearchAdapter } = require('../src/sources/legado-search.ts');
 const { bookKey, deleteDefinition, deleteRuleSources, getShelfBooks, mergeSources, parseLibraryData, saveDefinition, setAllRuleSourcesEnabled, setShelfBook } = require('../src/sources/management.ts');
 const { createLibraryDatabase } = require('../src/storage/library-database.ts');
-const { bqg349DefaultBundle, jgwxsDefaultBundle, washaiDefaultBundle } = require('../src/sources/defaults.ts');
+const { bqg349DefaultBundle, guazimanhuaDefaultBundle, jgwxsDefaultBundle, washaiDefaultBundle } = require('../src/sources/defaults.ts');
 
 
 const initial = () => ({ version: 1, definitions: [fanqieSource(), { kind: 'javascript', enabled: true, document: javascriptDocument }], shelf: ['js-example/clock'] });
@@ -311,6 +311,22 @@ test('bqg349 default installation preserves an existing custom definition', asyn
   await store.load({ version: 1, definitions: [custom], shelf: [] }, noLegacy);
   const upgraded = await createLibraryDatabase(db, { additionalDefaultBundles: [bqg349DefaultBundle] });
   assert.deepEqual((await upgraded.load(initial(), forbiddenLegacy)).definitions, [custom]);
+});
+
+test('Guazi installs once on upgrade and respects a later source deletion', async t => {
+  const { db, raw } = await database(t);
+  const empty = { version: 1, definitions: [], shelf: [] };
+  const old = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle });
+  const before = await old.load(empty, noLegacy);
+  const upgraded = await createLibraryDatabase(db, { defaultBundle: jgwxsDefaultBundle, additionalDefaultBundles: [guazimanhuaDefaultBundle] });
+  const installed = await upgraded.load(empty, forbiddenLegacy);
+  assert.deepEqual(installed.definitions.slice(0, before.definitions.length), before.definitions);
+  assert.equal(installed.definitions.at(-1).document.bookSourceName, '瓜子漫画');
+  assert.equal(installed.definitions.at(-1).document.bookSourceType, 2);
+  assert.equal(raw.prepare('SELECT count(*) AS count FROM default_source_bundles').get().count, 2);
+  const removed = deleteDefinition(installed, definitionId(guazimanhuaDefaultBundle.sources[0]));
+  await upgraded.save(removed);
+  assert.deepEqual((await upgraded.load(empty, forbiddenLegacy)).definitions, removed.definitions);
 });
 
 test('failed built-in source installation rolls back its definition and marker', async t => {

@@ -1,9 +1,9 @@
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Chapter, ChapterMeta } from '../../../../domain/books';
+import { RemoteImage } from '../../../../components/RemoteImage';
 import { useLibrary } from '../../../../state/library';
 import { loadReadingProgress, saveReadingProgress } from '../../../../storage/library';
 
@@ -78,7 +78,7 @@ function Session({ params }: { params: Params }) {
 
 function ComicPage({ uri, width, index, onError }: { uri: string; width: number; index: number; onError(): void }) {
   const [ratio, setRatio] = useState(0.7);
-  return <Image source={{ uri }} style={{ width, height: width / ratio, backgroundColor: '#3C4842' }} contentFit="contain" recyclingKey={uri} onLoad={event => { if (event.source.width > 0 && event.source.height > 0) setRatio(event.source.width / event.source.height); }} onError={onError} accessibilityLabel={`第 ${index + 1} 张漫画图片`} />;
+  return <RemoteImage uri={uri} style={{ width, height: width / ratio, backgroundColor: '#3C4842' }} contentFit="contain" recyclingKey={uri} onLoad={(imageWidth, imageHeight) => { if (imageWidth > 0 && imageHeight > 0) setRatio(imageWidth / imageHeight); }} onError={onError} accessibilityLabel={`第 ${index + 1} 张漫画图片`} />;
 }
 
 const styles = StyleSheet.create({

@@ -1,0 +1,41 @@
+{
+  "bookSourceName": "瓜子漫画",
+  "bookSourceUrl": "https://www.guazimanhua.com",
+  "bookSourceType": 2,
+  "bookSourceGroup": "漫画",
+  "bookSourceComment": "瓜子漫画公开搜索、首页推荐、作品目录与图片章节。",
+  "enabled": true,
+  "enabledExplore": true,
+  "exploreUrl": "首页::/",
+  "searchUrl": "/category.php?keyword={{key}}",
+  "ruleSearch": {
+    "bookList": ".card",
+    "name": "h3 a@text",
+    "author": ".meta@text##\\s*[·].*$##",
+    "kind": ".meta@text##^.*?[·]\\s*##",
+    "bookUrl": "h3 a@href",
+    "coverUrl": ".cover-wrap img@src"
+  },
+  "ruleExplore": {
+    "bookList": ".comic-card",
+    "name": "h3 a@text",
+    "kind": "p@text",
+    "bookUrl": "h3 a@href",
+    "coverUrl": ".hot-art img@src"
+  },
+  "ruleBookInfo": {
+    "name": ".mobile-comic-title@text",
+    "author": ".mobile-comic-tags[data-mobile-comic-author] a@text",
+    "intro": ".mobile-comic-desc@text",
+    "coverUrl": ".mobile-comic-cover@src"
+  },
+  "ruleToc": {
+    "chapterList": ".mobile-chapter-grid a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "reverse": true
+  },
+  "ruleContent": {
+    "content": ".reader-images img"
+  }
+}

@@ -111,6 +111,7 @@ export function createRuleReader(document: RuleSourceDocument) {
           seen.add(id);
           return [{ id, bookId, title: name.slice(0, 512) }];
         });
+        if (toc.reverse === true) chapters.reverse();
         catalogs.set(bookId, chapters);
         while (catalogs.size > 5) catalogs.delete(catalogs.keys().next().value!);
         return chapters;
