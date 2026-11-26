@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Noval · 阅读空间设计</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="workbench">
+    <aside class="sidebar">
+      <a class="wordmark" href="index.html"><span class="brand-icon">n.</span> noval<span class="version">DESIGN / 01</span></a>
+      <div class="sidebar-label">页面设计</div>
+      <nav id="page-nav" aria-label="设计页面"></nav>
+      <div class="sidebar-bottom"><span class="small-dot"></span> 基于现有功能设计<br><a href="overview.html">查看页面总览 ↗</a><a href="README.md">设计规范与交互说明 ↗</a></div>
+    </aside>
+    <main class="workspace">
+      <header class="workspace-header"><div><p class="eyebrow">NOVAL — A QUIETER READING SPACE</p><h1>把时间，留给故事。</h1><p class="workspace-subtitle">暖纸色 · 墨绿 · 留白，让每一次翻页都从容。</p></div><span class="edition">移动端页面设计<br>V1.0 / 2026.11</span></header>
+      <div class="design-stage">
+        <section class="preview-column" aria-label="手机交互预览">
+          <div class="preview-label"><span id="screen-number">01</span><span id="screen-label">书架 · 立体视图</span><span>390 × 844</span></div>
+          <div class="device"><div class="phone" id="phone"><div class="status-bar"><span>9:41</span><span class="status-icons" aria-hidden="true">▮▮▮  <svg viewBox="0 0 20 15"><path d="M2 5Q10-2 18 5M5 8q5-5 10 0M8 11q2-2 4 0" fill="none" stroke="currentColor" stroke-width="1.7"/></svg><span class="battery"></span></span></div><div id="app"></div><div class="home-indicator"></div></div></div>
+          <p class="preview-caption">可点击导航、书籍与按钮，体验页面流程</p>
+        </section>
+        <aside class="annotations"><p class="eyebrow">DESIGN NOTES</p><h2 id="note-title"></h2><p id="note-intro"></p><div id="note-items"></div><div class="state-picker"><h3>查看页面状态</h3><div id="state-options"></div></div><div class="swatches"><span style="--swatch:#F6F3EC"></span><span style="--swatch:#FFFEFA"></span><span style="--swatch:#294E42"></span><span style="--swatch:#BA694B"></span><span style="--swatch:#252D28"></span><p>纸白 / 墨绿 / 陶土 / 深墨</p></div></aside>
+      </div>
+      <footer class="workspace-footer"><span>舒适阅读，从清晰的界面开始。</span><span>独立设计原型 · 演示数据</span></footer>
+    </main>
+  </div>
+  <script src="prototype.js"></script>
+</body>
+</html>
