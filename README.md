@@ -26,3 +26,16 @@ Web 浏览器源需要 Node 服务和 Playwright 浏览器。开发机优先使�
 检查：`npx expo lint`、`npx tsc --noEmit`、`npm run test:search`、`npm run test:sources`、`npm run test:shelf`、`npm run test:reading`。
 
 没有付费 Apple 开发者账号时，可使用 `unsigned-ios` 云构建配置生成供个人重新签名的 iPhone IPA；安装前仍需签名，详见 [iOS 打包说明](docs/ios-packaging.md)。
+
+
+```bash
+# Android APK（打包后直接安装）：
+
+npx eas-cli@latest build --platform android --profile preview
+```
+
+```bash
+# iOS 未签名 IPA（需要自行签名才能安装）：
+
+npx eas-cli@latest build --platform ios --profile unsigned-ios
+```
