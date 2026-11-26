@@ -1,6 +1,6 @@
 import { PropsWithChildren } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { theme } from './theme';
+import { useThemedStyles, type AppTheme } from './theme';
 
 export function SourceButton({ children, onPress, disabled = false, secondary = false, danger = false, label }: PropsWithChildren<{
   onPress(): void;
@@ -9,6 +9,7 @@ export function SourceButton({ children, onPress, disabled = false, secondary = 
   danger?: boolean;
   label?: string;
 }>) {
+  const styles = useThemedStyles(createStyles);
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress}
       style={({ pressed }) => [styles.button, secondary && styles.secondary, danger && styles.danger, (disabled || pressed) && styles.dimmed]}>
@@ -18,10 +19,15 @@ export function SourceButton({ children, onPress, disabled = false, secondary = 
 }
 
 export function SourceMessage({ children, error = false }: PropsWithChildren<{ error?: boolean }>) {
+  const styles = useThemedStyles(createStyles);
   return <View style={[styles.message, error && styles.errorMessage]}><Text accessibilityRole={error ? 'alert' : undefined} accessibilityLiveRegion="polite" style={[styles.messageText, error && styles.errorText]}>{children}</Text></View>;
 }
 
-export const sourceStyles = StyleSheet.create({
+export function useSourceStyles() {
+  return useThemedStyles(createSourceStyles);
+}
+
+const createSourceStyles = (theme: AppTheme) => StyleSheet.create({
   label: { color: theme.ink, fontSize: 14, fontWeight: '700', marginBottom: 9 },
   helper: { color: theme.muted, fontSize: 12, lineHeight: 20, marginBottom: 16 },
   input: { minHeight: 50, backgroundColor: theme.paper, color: theme.ink, borderRadius: 12, borderWidth: 1, borderColor: theme.line, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, marginBottom: 20 },
@@ -35,16 +41,16 @@ export const sourceStyles = StyleSheet.create({
   switchHint: { color: theme.muted, fontSize: 12, lineHeight: 19 },
 });
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   button: { minHeight: 44, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, backgroundColor: theme.dark, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.dark },
   buttonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   secondary: { backgroundColor: theme.paper, borderColor: theme.line },
   secondaryText: { color: theme.ink },
-  danger: { backgroundColor: '#FBEDE9', borderColor: '#F2D4CC' },
-  dangerText: { color: '#A44132' },
+  danger: { backgroundColor: theme.dangerSoft, borderColor: theme.dangerLine },
+  dangerText: { color: theme.danger },
   dimmed: { opacity: 0.45 },
-  message: { backgroundColor: '#EAF0E9', padding: 14, borderRadius: 12, marginBottom: 16 },
-  messageText: { color: '#3B6046', fontSize: 13, lineHeight: 20 },
-  errorMessage: { backgroundColor: '#FBEDE9' },
-  errorText: { color: '#A44132' },
+  message: { backgroundColor: theme.successSoft, padding: 14, borderRadius: 12, marginBottom: 16 },
+  messageText: { color: theme.success, fontSize: 13, lineHeight: 20 },
+  errorMessage: { backgroundColor: theme.dangerSoft },
+  errorText: { color: theme.danger },
 });

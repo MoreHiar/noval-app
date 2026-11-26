@@ -1,9 +1,10 @@
 import { PropsWithChildren } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from './theme';
+import { useThemedStyles, type AppTheme } from './theme';
 
 export function Page({ title, eyebrow, children }: PropsWithChildren<{ title: string; eyebrow?: string }>) {
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   return (
     <ScrollView style={styles.page} contentContainerStyle={[styles.content, { paddingTop: insets.top + 22 }]} keyboardShouldPersistTaps="handled">
@@ -16,7 +17,7 @@ export function Page({ title, eyebrow, children }: PropsWithChildren<{ title: st
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.background },
   content: { paddingHorizontal: 20, paddingBottom: 130, maxWidth: 760, width: '100%', alignSelf: 'center' },
   heading: { marginBottom: 24 },

@@ -4,12 +4,14 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookCarousel } from '../../components/BookCarousel';
 import { BookCard } from '../../components/BookCard';
+import { BrandLogo } from '../../components/BrandLogo';
 import { ShelfButton } from '../../components/ShelfButton';
-import { theme } from '../../components/theme';
+import { useThemedStyles, type AppTheme } from '../../components/theme';
 import { Book } from '../../domain/books';
 import { useLibrary } from '../../state/library';
 
 export default function ShelfScreen() {
+  const styles = useThemedStyles(createStyles);
   const { shelfBooks: books, ready, storageError, retryLoad } = useLibrary();
   const insets = useSafeAreaInsets();
   const [requestedIndex, setSelectedIndex] = useState(0);
@@ -24,7 +26,7 @@ export default function ShelfScreen() {
   return (
     <ScrollView style={styles.page} contentContainerStyle={[styles.content, { paddingTop: insets.top + 10 }]} showsVerticalScrollIndicator={false}>
       <View style={styles.topRow}>
-        <View><Text style={styles.brand}>书架</Text><Text style={styles.brandCaption}>02  /  PERSONAL ARCHIVE</Text></View>
+        <View style={styles.brandRow}><BrandLogo size={40} /><View><Text style={styles.brand}>书架</Text><Text style={styles.brandCaption}>NOVAL  /  PERSONAL ARCHIVE</Text></View></View>
         <Link href="/discover" asChild><Pressable style={styles.searchButton} accessibilityRole="button" accessibilityLabel="搜索书籍"><Text style={styles.searchIcon}>⌕</Text></Pressable></Link>
       </View>
       <View style={styles.topRule} />
@@ -75,43 +77,44 @@ export default function ShelfScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#F8F8F4' },
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+  page: { flex: 1, backgroundColor: theme.background },
   content: { maxWidth: 760, width: '100%', alignSelf: 'center', paddingHorizontal: 21, paddingBottom: 130 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 45 },
-  brand: { color: '#1F2320', fontSize: 26, fontWeight: '900', letterSpacing: 1 },
-  brandCaption: { color: '#858981', fontSize: 8, letterSpacing: 2, marginTop: 2 },
-  searchButton: { width: 37, height: 37, borderRadius: 19, backgroundColor: '#FFFFFFD9', alignItems: 'center', justifyContent: 'center', shadowColor: '#9A9B93', shadowOpacity: 0.08, shadowRadius: 10, elevation: 2 },
+  brand: { color: theme.ink, fontSize: 26, fontWeight: '900', letterSpacing: 1 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  brandCaption: { color: theme.muted, fontSize: 8, letterSpacing: 2, marginTop: 2 },
+  searchButton: { width: 37, height: 37, borderRadius: 19, backgroundColor: theme.paper, alignItems: 'center', justifyContent: 'center', shadowColor: '#9A9B93', shadowOpacity: 0.08, shadowRadius: 10, elevation: 2 },
   searchIcon: { color: theme.ink, fontSize: 25, lineHeight: 29 },
-  topRule: { height: 1, backgroundColor: '#E6E8E1', marginTop: 16, marginBottom: 21 },
+  topRule: { height: 1, backgroundColor: theme.line, marginTop: 16, marginBottom: 21 },
   overlineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
-  overline: { color: '#93988F', fontSize: 9, letterSpacing: 2 },
-  overlineDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#464C43' },
-  heading: { color: '#222722', fontSize: 25, fontWeight: '800', marginBottom: 17 },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#E8EAE3' },
-  collection: { color: '#30352E', fontSize: 13, fontWeight: '700' },
+  overline: { color: theme.muted, fontSize: 9, letterSpacing: 2 },
+  overlineDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: theme.muted },
+  heading: { color: theme.ink, fontSize: 25, fontWeight: '800', marginBottom: 17 },
+  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: theme.line },
+  collection: { color: theme.ink, fontSize: 13, fontWeight: '700' },
   controlRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  count: { color: '#90968C', fontSize: 11 },
+  count: { color: theme.muted, fontSize: 11 },
   modeButton: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center' },
-  modeIcon: { color: '#4C514A', fontSize: 20 },
+  modeIcon: { color: theme.ink, fontSize: 20 },
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: -5, marginBottom: 11, gap: 14 },
   arrowButton: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
-  arrowText: { color: '#70766D', fontSize: 26, lineHeight: 29 },
+  arrowText: { color: theme.muted, fontSize: 26, lineHeight: 29 },
   dots: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#C6CBC1' },
-  activeDot: { width: 13, height: 3, borderRadius: 2, backgroundColor: '#4A5148' },
-  featured: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E8EAE3' },
+  dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: theme.line },
+  activeDot: { width: 13, height: 3, borderRadius: 2, backgroundColor: theme.ink },
+  featured: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTopWidth: 1, borderTopColor: theme.line },
   featuredCopy: { flex: 1, paddingRight: 15 },
-  featuredLabel: { color: '#999E95', fontSize: 9, letterSpacing: 2, marginBottom: 7 },
-  featuredTitle: { color: '#202520', fontSize: 19, fontWeight: '800', lineHeight: 26, marginBottom: 5 },
-  featuredMeta: { color: '#93988E', fontSize: 11 },
-  featuredArrow: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, borderWidth: 1, borderColor: '#D8DDD4' },
-  featuredArrowText: { color: '#343B34', fontSize: 20 },
+  featuredLabel: { color: theme.muted, fontSize: 9, letterSpacing: 2, marginBottom: 7 },
+  featuredTitle: { color: theme.ink, fontSize: 19, fontWeight: '800', lineHeight: 26, marginBottom: 5 },
+  featuredMeta: { color: theme.muted, fontSize: 11 },
+  featuredArrow: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, borderWidth: 1, borderColor: theme.line },
+  featuredArrowText: { color: theme.ink, fontSize: 20 },
   list: { marginTop: 20 },
   listItem: { marginBottom: 14 },
   removeButton: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-end' },
   removeText: { color: theme.muted, fontSize: 13 },
-  error: { color: '#A44036', fontSize: 13, marginTop: 12 },
+  error: { color: theme.danger, fontSize: 13, marginTop: 12 },
   empty: { alignItems: 'center', paddingTop: 85, paddingBottom: 70 },
   emptyTitle: { color: theme.ink, fontSize: 20, fontWeight: '800', marginBottom: 10 },
   emptyBody: { color: theme.muted, fontSize: 13, marginBottom: 22 },

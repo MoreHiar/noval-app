@@ -1,7 +1,8 @@
+import { useAppTheme } from '../../../state/appearance';
 import { Link, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { theme } from '../../../components/theme';
+import { useThemedStyles, type AppTheme } from '../../../components/theme';
 import { BookCover } from '../../../components/BookCover';
 import { ShelfButton } from '../../../components/ShelfButton';
 import type { Book, ChapterMeta, ReadingProgress } from '../../../domain/books';
@@ -14,6 +15,8 @@ export default function BookScreen() {
 }
 
 function BookDetails({ sourceId, bookId }: { sourceId: string; bookId: string }) {
+  const styles = useThemedStyles(createStyles);
+  const { theme } = useAppTheme();
   const { getSource, ready, storageError, retryLoad } = useLibrary();
   const source = getSource(sourceId);
   const [book, setBook] = useState<Book | null>(null);
@@ -83,7 +86,7 @@ function BookDetails({ sourceId, bookId }: { sourceId: string; bookId: string })
   />;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.background },
   content: { padding: 20, paddingBottom: 50, maxWidth: 760, width: '100%', alignSelf: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 18 },
@@ -95,7 +98,7 @@ const styles = StyleSheet.create({
   metaLine: { color: theme.accent, fontSize: 12, marginBottom: 7 },
   source: { color: theme.muted, fontSize: 11 },
   sectionTitle: { color: theme.ink, fontSize: 18, fontWeight: '800' },
-  summary: { color: '#58615B', fontSize: 14, lineHeight: 24, marginTop: 12, marginBottom: 25 },
+  summary: { color: theme.muted, fontSize: 14, lineHeight: 24, marginTop: 12, marginBottom: 25 },
   actions: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
   readButton: { minHeight: 48, backgroundColor: theme.dark, borderRadius: 14, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 22 },
   readText: { color: 'white', fontWeight: '700', fontSize: 14 },
@@ -106,14 +109,14 @@ const styles = StyleSheet.create({
   refresh: { minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' },
   refreshText: { color: theme.accent, fontSize: 13 },
   chapter: { flexDirection: 'row', alignItems: 'center', minHeight: 64, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.line, gap: 12 },
-  chapterIndex: { color: '#A1A99F', fontSize: 11, minWidth: 30, fontVariant: ['tabular-nums'] },
+  chapterIndex: { color: theme.muted, fontSize: 11, minWidth: 30, fontVariant: ['tabular-nums'] },
   chapterTitle: { flex: 1, color: theme.ink, fontSize: 14, lineHeight: 22 },
   activeChapter: { color: theme.accent, fontWeight: '700' },
   chevron: { color: theme.muted, fontSize: 13 },
   locked: { opacity: 0.55 },
-  retry: { minHeight: 44, paddingHorizontal: 18, justifyContent: 'center', alignSelf: 'center', backgroundColor: '#E7EDE3', borderRadius: 12, marginTop: 10 },
+  retry: { minHeight: 44, paddingHorizontal: 18, justifyContent: 'center', alignSelf: 'center', backgroundColor: theme.secondary, borderRadius: 12, marginTop: 10 },
   retryText: { color: theme.accent, fontSize: 13, fontWeight: '700' },
-  error: { color: '#A44036', fontSize: 13, lineHeight: 22 },
+  error: { color: theme.danger, fontSize: 13, lineHeight: 22 },
   catalogError: { paddingVertical: 16 },
   empty: { padding: 30, alignItems: 'center', gap: 16 },
 });

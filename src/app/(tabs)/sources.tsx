@@ -1,10 +1,11 @@
+import { useAppTheme } from '../../state/appearance';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SourceButton, SourceMessage, sourceStyles as s } from '../../components/SourceControls';
+import { SourceButton, SourceMessage, useSourceStyles } from '../../components/SourceControls';
 import { TabBarIcon } from '../../components/TabBarIcon';
-import { theme } from '../../components/theme';
+import { useThemedStyles, type AppTheme } from '../../components/theme';
 import { RuleManagedSource } from '../../domain/books';
 import { exportSourceFile } from '../../sources/files';
 import { definitionId, isRuleSource, sourceTypeName } from '../../sources/legado';
@@ -15,6 +16,9 @@ const filters = [{ key: 'all', label: '全部' }, { key: 'enabled', label: '已�
 type Filter = typeof filters[number]['key'];
 
 export default function SourcesScreen() {
+  const styles = useThemedStyles(createStyles);
+  const s = useSourceStyles();
+  const { theme } = useAppTheme();
   const { sourceDefinitions: allDefinitions, ready, storageError, retryLoad, setSourceEnabled, setAllSourcesEnabled, removeSource, removeSources, shelf } = useLibrary();
   const sourceDefinitions = useMemo(() => allDefinitions.filter(isRuleSource), [allDefinitions]);
   const deletableCount = sourceDefinitions.length;
@@ -91,7 +95,7 @@ export default function SourcesScreen() {
             <View style={styles.headingRow}><Text style={styles.heading}>书源管理</Text><View style={styles.totalBadge}><Text style={styles.totalText}>{sourceDefinitions.length} 个书源</Text></View></View>
             <Text style={styles.subtitle}>管理网站、搜索和解析规则，兼容阅读书源格式。</Text>
             <View style={styles.summary}>
-              <View style={styles.summaryIcon}><TabBarIcon name="sources" color={theme.dark} size={29} /></View>
+              <View style={styles.summaryIcon}><TabBarIcon name="sources" color={theme.ink} size={29} /></View>
               <View style={styles.summaryCopy}><Text style={styles.summaryTitle}>{enabledCount} 个已启用</Text><Text style={styles.summaryHint}>启用状态与规则保存在本地，可随时导出。</Text></View>
             </View>
             <Text style={styles.runtimeHint}>已启用书源会参与搜索；暂支持简单 GET／POST 与 CSS／Legado 选择器，未支持的规则会在搜索页显示原因。在线目录、正文与脚本运行仍在接入中。</Text>
@@ -158,21 +162,21 @@ export default function SourcesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.background },
   content: { paddingHorizontal: 20, paddingBottom: 130, maxWidth: 760, width: '100%', alignSelf: 'center' },
   eyebrow: { color: theme.accent, fontSize: 10, fontWeight: '700', letterSpacing: 2.5, marginBottom: 9 },
   headingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   heading: { color: theme.ink, fontSize: 30, fontWeight: '800', letterSpacing: 1 },
-  totalBadge: { backgroundColor: '#EAE8E0', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
-  totalText: { color: '#666E62', fontSize: 11, fontWeight: '600' },
+  totalBadge: { backgroundColor: theme.secondary, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
+  totalText: { color: theme.muted, fontSize: 11, fontWeight: '600' },
   runtimeHint: { color: theme.muted, fontSize: 12, lineHeight: 19, marginBottom: 18 },
   subtitle: { color: theme.muted, fontSize: 12, lineHeight: 20, marginTop: 9, marginBottom: 22 },
-  summary: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#EAEDE5', borderRadius: 18, padding: 18, marginBottom: 18 },
-  summaryIcon: { width: 45, height: 45, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFFA0', borderRadius: 14 },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: theme.secondary, borderRadius: 18, padding: 18, marginBottom: 18 },
+  summaryIcon: { width: 45, height: 45, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.paper, borderRadius: 14 },
   summaryCopy: { flex: 1 },
-  summaryTitle: { color: theme.dark, fontSize: 18, fontWeight: '800', marginBottom: 5 },
-  summaryHint: { color: '#7A8376', fontSize: 11, lineHeight: 18 },
+  summaryTitle: { color: theme.ink, fontSize: 18, fontWeight: '800', marginBottom: 5 },
+  summaryHint: { color: theme.muted, fontSize: 11, lineHeight: 18 },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 22 },
   bulkToolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 18 },
   selectionBar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 18 },
@@ -190,22 +194,22 @@ const styles = StyleSheet.create({
   activeFilterText: { color: '#FFFFFF' },
   resultCount: { marginLeft: 'auto', fontSize: 11, color: theme.muted },
   source: { backgroundColor: theme.paper, borderRadius: 18, paddingHorizontal: 17, paddingTop: 17, marginBottom: 14, borderWidth: 1, borderColor: theme.line },
-  disabledSource: { backgroundColor: '#FBFAF7' },
+  disabledSource: { backgroundColor: theme.background },
   sourceHeading: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   sourceBadge: { width: 43, height: 43, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center', borderRadius: 13 },
   sourceInfo: { flex: 1, minWidth: 0 },
   sourceName: { color: theme.ink, fontSize: 16, lineHeight: 23, fontWeight: '700' },
   sourceId: { color: theme.muted, fontSize: 10, marginTop: 3 },
-  description: { color: '#7F857D', fontSize: 12, lineHeight: 19, marginTop: 13 },
+  description: { color: theme.muted, fontSize: 12, lineHeight: 19, marginTop: 13 },
   metadata: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginVertical: 15 },
   kind: { color: theme.accent, fontSize: 10, backgroundColor: theme.accentSoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, overflow: 'hidden' },
   metaText: { color: theme.muted, fontSize: 11 },
-  status: { marginLeft: 'auto', color: '#4B785A', fontSize: 10 },
+  status: { marginLeft: 'auto', color: theme.success, fontSize: 10 },
   inactiveStatus: { color: theme.muted },
-  sourceActions: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F0EEE8' },
+  sourceActions: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.line },
   rowButton: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center' },
-  rowButtonText: { color: '#586252', fontSize: 12, fontWeight: '600' },
-  deleteText: { color: '#B57365', fontSize: 12, fontWeight: '600' },
+  rowButtonText: { color: theme.ink, fontSize: 12, fontWeight: '600' },
+  deleteText: { color: theme.danger, fontSize: 12, fontWeight: '600' },
   actionDivider: { width: 1, height: 12, backgroundColor: theme.line },
   empty: { paddingVertical: 60, alignItems: 'center' },
   emptyTitle: { color: theme.ink, fontSize: 18, fontWeight: '700', marginBottom: 10 },
@@ -213,6 +217,6 @@ const styles = StyleSheet.create({
   loading: { padding: 50 },
   backdrop: { flex: 1, backgroundColor: '#202A2766', paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' },
   dialog: { width: '100%', maxWidth: 420, backgroundColor: theme.background, borderRadius: 22, padding: 24 },
-  dialogText: { color: '#737C72', fontSize: 13, lineHeight: 23, marginBottom: 24 },
+  dialogText: { color: theme.muted, fontSize: 13, lineHeight: 23, marginBottom: 24 },
   dialogActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
 });

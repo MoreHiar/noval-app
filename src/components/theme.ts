@@ -1,10 +1,11 @@
-export const theme = {
-  background: '#F7F4EE',
-  paper: '#FFFFFF',
-  ink: '#242A28',
-  muted: '#7D837E',
-  line: '#EAE6DE',
-  accent: '#D87B55',
-  accentSoft: '#F9EDE4',
-  dark: '#23312F',
-};
+import { useMemo } from 'react';
+import { useAppTheme } from '../state/appearance';
+import type { AppTheme } from './palette';
+
+export { lightTheme, darkTheme, type AppTheme } from './palette';
+
+// Each screen keeps its layout while colors follow the shared appearance state.
+export function useThemedStyles<T>(createStyles: (theme: AppTheme) => T): T {
+  const { theme } = useAppTheme();
+  return useMemo(() => createStyles(theme), [createStyles, theme]);
+}

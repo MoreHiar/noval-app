@@ -1,10 +1,11 @@
 import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Book } from '../domain/books';
-import { theme } from './theme';
+import { useThemedStyles, type AppTheme } from './theme';
 import { BookCover } from './BookCover';
 
 export function BookCard({ book, compact = false, sourceName }: { book: Book; compact?: boolean; sourceName?: string }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <Link href={{ pathname: '/book/[sourceId]/[bookId]', params: { sourceId: book.sourceId, bookId: book.id } }} asChild>
       <Pressable style={StyleSheet.flatten([styles.card, compact && styles.compact])} accessibilityRole="button" accessibilityLabel={`查看${book.title}`}>
@@ -21,7 +22,7 @@ export function BookCard({ book, compact = false, sourceName }: { book: Book; co
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', padding: 13, backgroundColor: theme.paper, borderRadius: 18, marginBottom: 12, gap: 14 },
   compact: { marginBottom: 10 },
   info: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
@@ -29,5 +30,5 @@ const styles = StyleSheet.create({
   author: { color: theme.muted, fontSize: 12, marginBottom: 10 },
   summary: { color: theme.muted, fontSize: 12, lineHeight: 18, marginBottom: 7 },
   status: { color: theme.accent, fontSize: 11, fontWeight: '600' },
-  chevron: { color: '#B8B8B2', fontSize: 26, paddingRight: 3 },
+  chevron: { color: theme.muted, fontSize: 26, paddingRight: 3 },
 });

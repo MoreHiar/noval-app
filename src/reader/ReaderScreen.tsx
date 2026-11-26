@@ -1,3 +1,5 @@
+import { useAppTheme } from '../state/appearance';
+import { useThemedStyles, type AppTheme } from '../components/theme';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -22,22 +24,26 @@ function backToBook(sourceId: string, bookId: string) {
 }
 
 export default function ReaderScreen() {
+  const { colorScheme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<ReaderParams>();
   const [attempt, setAttempt] = useState(0);
   const preferences = useReaderPreferences();
   return <View style={styles.screen}>
-    <StatusBar style="dark" />
+    <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     <ReaderSession key={`${params.sourceId}/${params.bookId}/${params.chapterId}/${params.offset ?? ''}/${params.position ?? ''}/${attempt}`} params={params} preferences={preferences} retry={() => setAttempt(current => current + 1)} />
   </View>;
 }
 
 function ReaderPlaceholder({ params, message, retry }: { params: ReaderParams; message: string; retry?: () => void }) {
+  const { theme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   return <View style={styles.center}>
     <Pressable style={[styles.backButton, { top: insets.top + 8, left: insets.left + 12 }]} onPress={() => backToBook(params.sourceId, params.bookId)} accessibilityRole="button" accessibilityLabel="返回"><Text style={styles.backText}>‹ 返回</Text></Pressable>
-    {!retry && message.includes('正在') ? <ActivityIndicator color="#526C63" /> : null}
+    {!retry && message.includes('正在') ? <ActivityIndicator color={theme.success} /> : null}
     <Text style={styles.message}>{message}</Text>
-    {retry ? <Pressable style={styles.retry} onPress={retry} accessibilityRole="button"><Text>重试</Text></Pressable> : null}
+    {retry ? <Pressable style={styles.retry} onPress={retry} accessibilityRole="button"><Text style={{ color: theme.readerInk }}>重试</Text></Pressable> : null}
   </View>;
 }
 
@@ -69,6 +75,8 @@ function ReaderSession({ params, preferences, retry }: { params: ReaderParams; p
 }
 
 function ReadingCanvas({ data, sourceId, bookId, preferencesState }: { data: LoadedChapter; sourceId: string; bookId: string; preferencesState: PreferencesState }) {
+  const { theme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const { book, chapter, chapters, fontFamily } = data;
   const { preferences, update, error: preferencesError } = preferencesState;
   const { fontScale } = useWindowDimensions();
@@ -186,7 +194,7 @@ function ReadingCanvas({ data, sourceId, bookId, preferencesState }: { data: Loa
         {positioned ? <View pointerEvents="none" style={styles.textLayers}>
           {transition ? <Animated.View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.textLayer, outgoingStyle]}><Text style={bodyTextStyle}>{transition.text}</Text></Animated.View> : null}
           <Animated.View style={[styles.textLayer, incomingStyle]}><Text selectable={false} style={bodyTextStyle}>{page.text}</Text></Animated.View>
-        </View> : <ActivityIndicator color="#526C63" />}
+        </View> : <ActivityIndicator color={theme.success} />}
         {Platform.OS !== 'web' && size.width > 0 && size.height > 0 && measured?.key !== measurementKey ? <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.measure}>
           <Text style={bodyTextStyle} onTextLayout={event => {
             const computed = paginateMeasuredLines(text, event.nativeEvent.lines, linesPerPage) ?? fallback;
@@ -206,27 +214,27 @@ function ReadingCanvas({ data, sourceId, bookId, preferencesState }: { data: Loa
   </View>;
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F4EEE2' },
-  page: { flex: 1, backgroundColor: '#F4EEE2' },
-  center: { flex: 1, backgroundColor: '#F4EEE2', alignItems: 'center', justifyContent: 'center', padding: 28, gap: 16 },
-  message: { color: '#706455', textAlign: 'center', lineHeight: 24 },
-  retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 22, backgroundColor: '#E7DECF', borderRadius: 12 },
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.readerBackground },
+  page: { flex: 1, backgroundColor: theme.readerBackground },
+  center: { flex: 1, backgroundColor: theme.readerBackground, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 16 },
+  message: { color: theme.readerMuted, textAlign: 'center', lineHeight: 24 },
+  retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 22, backgroundColor: theme.readerControl, borderRadius: 12 },
   backButton: { position: 'absolute', minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' },
-  backText: { color: '#526C63', fontSize: 15 },
+  backText: { color: theme.success, fontSize: 15 },
   header: { paddingTop: 12, paddingBottom: 24, paddingHorizontal: 24, maxWidth: 680, width: '100%', alignSelf: 'center', flexDirection: 'row', gap: 20 },
-  bookTitle: { flex: 1, color: '#A19480', fontSize: 11 },
-  chapterTitle: { flex: 1, color: '#A19480', fontSize: 11, textAlign: 'right' },
+  bookTitle: { flex: 1, color: theme.readerMuted, fontSize: 11 },
+  chapterTitle: { flex: 1, color: theme.readerMuted, fontSize: 11, textAlign: 'right' },
   body: { flex: 1, paddingHorizontal: 24, maxWidth: 680, width: '100%', alignSelf: 'center' },
   viewport: { flex: 1, overflow: 'hidden' },
   touchZones: { ...StyleSheet.absoluteFill, flexDirection: 'row' },
   sideZone: { flex: 1 },
   centerZone: { flex: 2 },
-  bodyText: { color: '#39352F', fontWeight: '400' },
+  bodyText: { color: theme.readerInk, fontWeight: '400' },
   textLayers: { flex: 1 },
-  textLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: '#F4EEE2' },
+  textLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: theme.readerBackground },
   measure: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 6, maxWidth: 680, width: '100%', alignSelf: 'center' },
-  footerText: { color: '#A19480', fontSize: 10, fontVariant: ['tabular-nums'] },
-  error: { color: '#A44036', fontSize: 12, textAlign: 'center', paddingHorizontal: 24, paddingTop: 8 },
+  footerText: { color: theme.readerMuted, fontSize: 10, fontVariant: ['tabular-nums'] },
+  error: { color: theme.danger, fontSize: 12, textAlign: 'center', paddingHorizontal: 24, paddingTop: 8 },
 });

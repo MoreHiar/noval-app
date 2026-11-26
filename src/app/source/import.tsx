@@ -1,9 +1,10 @@
+import { useAppTheme } from '../../state/appearance';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Page } from '../../components/Page';
-import { SourceButton, SourceMessage, sourceStyles as s } from '../../components/SourceControls';
-import { theme } from '../../components/theme';
+import { SourceButton, SourceMessage, useSourceStyles } from '../../components/SourceControls';
+import { useThemedStyles, type AppTheme } from '../../components/theme';
 import { RuleManagedSource } from '../../domain/books';
 import { pickSourceFile } from '../../sources/files';
 import { definitionId, isRuleSource, ruleSourceId, sourceTypeName } from '../../sources/legado';
@@ -14,6 +15,9 @@ import { useLibrary } from '../../state/library';
 type Mode = 'network' | 'local';
 
 export default function SourceImportScreen() {
+  const styles = useThemedStyles(createStyles);
+  const s = useSourceStyles();
+  const { theme } = useAppTheme();
   const { importSources, sourceDefinitions, ready, storageError } = useLibrary();
   const [mode, setMode] = useState<Mode>('network');
   const [url, setUrl] = useState('');
@@ -79,7 +83,7 @@ export default function SourceImportScreen() {
         </View>
         {mode === 'network' ? <>
           <Text style={s.label}>书源 JSON 地址</Text>
-          <TextInput style={s.input} value={url} onChangeText={text => { setUrl(text); change(''); }} editable={!locked} autoCapitalize="none" autoCorrect={false} placeholder="https://…/shuyuan.json" accessibilityLabel="网络书源地址" />
+          <TextInput placeholderTextColor={theme.muted} style={s.input} value={url} onChangeText={text => { setUrl(text); change(''); }} editable={!locked} autoCapitalize="none" autoCorrect={false} placeholder="https://…/shuyuan.json" accessibilityLabel="网络书源地址" />
           <Text style={s.helper}>XIU2 分享页是 yuedu.xiu2.xyz，实际 JSON 地址为 yuedu.xiu2.xyz/shuyuan。链接不一定以 .json 结尾。</Text>
           <View style={s.actions}>
             <SourceButton onPress={download} disabled={locked || !ready || !url.trim()}>{downloading ? '下载中…' : '下载并预览'}</SourceButton>
@@ -89,7 +93,7 @@ export default function SourceImportScreen() {
           <View style={s.actions}><SourceButton onPress={selectFile} disabled={locked || !ready}>选择 JSON 文件</SourceButton></View>
           {fileName ? <Text style={s.helper}>已选择：{fileName}</Text> : null}
           <Text style={s.label}>也可粘贴书源 JSON</Text>
-          <TextInput style={[s.input, s.editor]} value={input} onChangeText={text => { change(text); setFileName(''); }} editable={!locked} multiline autoCapitalize="none" autoCorrect={false} textAlignVertical="top" placeholder={'[{"bookSourceName":"…","bookSourceUrl":"…","ruleSearch":{…}}]'} accessibilityLabel="导入书源 JSON" />
+          <TextInput placeholderTextColor={theme.muted} style={[s.input, s.editor]} value={input} onChangeText={text => { change(text); setFileName(''); }} editable={!locked} multiline autoCapitalize="none" autoCorrect={false} textAlignVertical="top" placeholder={'[{"bookSourceName":"…","bookSourceUrl":"…","ruleSearch":{…}}]'} accessibilityLabel="导入书源 JSON" />
           {!preview && <SourceButton onPress={validate} disabled={locked || !ready || !input.trim()}>校验并预览</SourceButton>}
         </>}
         {storageError ? <SourceMessage error>{storageError}</SourceMessage> : null}
@@ -118,7 +122,7 @@ export default function SourceImportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   fill: { flex: 1 },
   meta: { color: theme.muted, fontSize: 12, lineHeight: 19 },
   conflict: { color: theme.accent, fontSize: 12, marginTop: 8 },

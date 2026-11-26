@@ -1,3 +1,5 @@
+import { useAppTheme } from '../state/appearance';
+import { useThemedStyles, type AppTheme } from './theme';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { BrowserTask, currentBrowserTask, subscribeBrowser } from '../sources/browser-session';
@@ -9,9 +11,13 @@ export function SourceBrowser() {
   return task ? <BrowserWindow key={task.id} task={task} /> : null;
 }
 function BrowserButton({label,onPress}:{label:string;onPress():void}) {
-  return <Pressable accessibilityRole="button" style={styles.button} onPress={onPress}><Text>{label}</Text></Pressable>;
+  const { theme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  return <Pressable accessibilityRole="button" style={styles.button} onPress={onPress}><Text style={{ color: theme.ink }}>{label}</Text></Pressable>;
 }
 function BrowserWindow({task}:{task:BrowserTask}) {
+  const { theme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const [screenshot,setScreenshot] = useState('');
   const [error,setError] = useState('');
   const [text,setText] = useState('');
@@ -56,9 +62,9 @@ function BrowserWindow({task}:{task:BrowserTask}) {
       <View style={styles.image} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
         {screenshot ? <Pressable accessibilityRole="button" accessibilityLabel="验证网页，点击输入框或提交按钮" onPress={event => { void perform('click',{x:event.nativeEvent.locationX / width * 390,y:event.nativeEvent.locationY / width * 390}); }}><Image source={{uri:screenshot}} style={{width:'100%',aspectRatio:390/650}} /></Pressable> : <Text style={styles.hint}>正在加载网页…</Text>}
       </View>
-      <View style={styles.row}><TextInput accessibilityLabel="网页输入内容" value={text} onChangeText={setText} placeholder="点击网页输入框后，在这里输入" style={styles.input}/><BrowserButton label="输入" onPress={() => { void perform('type',{text}); setText(''); }}/></View>
+      <View style={styles.row}><TextInput placeholderTextColor={theme.muted} accessibilityLabel="网页输入内容" value={text} onChangeText={setText} placeholder="点击网页输入框后，在这里输入" style={styles.input}/><BrowserButton label="输入" onPress={() => { void perform('type',{text}); setText(''); }}/></View>
       <View style={styles.row}><BrowserButton label="提交 ↵" onPress={() => { void perform('key',{key:'Enter'}); }}/><BrowserButton label="删除" onPress={() => { void perform('key',{key:'Backspace'}); }}/><BrowserButton label="上滚" onPress={() => { void perform('scroll',{direction:-1}); }}/><BrowserButton label="下滚" onPress={() => { void perform('scroll',{direction:1}); }}/><BrowserButton label="重试" onPress={() => { void perform('start',{request:task.request}); }}/></View>
     </ScrollView></View>
   </Modal>;
 }
-const styles=StyleSheet.create({backdrop:{flex:1,backgroundColor:'#0008',alignItems:'center',justifyContent:'center',padding:12},panel:{backgroundColor:'#F8F5EE',borderRadius:16,width:'100%',maxWidth:430,maxHeight:'100%'},panelContent:{padding:12},title:{flex:1,fontWeight:'700'},row:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},button:{minHeight:44,padding:10,justifyContent:'center',backgroundColor:'#E7EDE3',borderRadius:8},hint:{fontSize:12,lineHeight:18,paddingVertical:8,color:'#706455'},error:{color:'#A44036',fontSize:12},image:{width:'100%',maxWidth:390,alignSelf:'center',backgroundColor:'white'},input:{flex:1,minHeight:44,minWidth:140,borderWidth:1,borderColor:'#DDD1C1',borderRadius:8,padding:8}});
+const createStyles = (theme: AppTheme) => StyleSheet.create({backdrop:{flex:1,backgroundColor:'#0008',alignItems:'center',justifyContent:'center',padding:12},panel:{backgroundColor:theme.background,borderRadius:16,width:'100%',maxWidth:430,maxHeight:'100%'},panelContent:{padding:12},title:{flex:1,fontWeight:'700',color:theme.ink},row:{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'},button:{minHeight:44,padding:10,justifyContent:'center',backgroundColor:theme.secondary,borderRadius:8},hint:{fontSize:12,lineHeight:18,paddingVertical:8,color:theme.muted},error:{color:theme.danger,fontSize:12},image:{width:'100%',maxWidth:390,alignSelf:'center',backgroundColor:'white'},input:{flex:1,minHeight:44,minWidth:140,borderWidth:1,borderColor:theme.line,borderRadius:8,padding:8,color:theme.ink}});

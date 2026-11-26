@@ -1,15 +1,18 @@
+import { useAppTheme } from '../../state/appearance';
 import { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookCard } from '../../components/BookCard';
 import { TabBarIcon } from '../../components/TabBarIcon';
-import { theme } from '../../components/theme';
+import { useThemedStyles, type AppTheme } from '../../components/theme';
 import { searchSources, SearchResult, summarizeSearch } from '../../sources/search';
 import { useLibrary } from '../../state/library';
 
 type SearchState = { query: string; sourceId: string | null; results: SearchResult[]; done: boolean };
 
 export default function DiscoverScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { enabledSources: sources, ready } = useLibrary();
   const [query, setQuery] = useState('');
@@ -105,7 +108,7 @@ export default function DiscoverScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.background },
   content: { paddingHorizontal: 20, paddingBottom: 130, maxWidth: 760, width: '100%', alignSelf: 'center' },
   heading: { marginBottom: 24 },
