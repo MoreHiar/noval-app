@@ -78,7 +78,7 @@ export function ReaderControls(props: Props) {
           <FlatList data={chapters} keyExtractor={chapter => chapter.id} initialScrollIndex={Math.max(0, chapterIndex)} getItemLayout={(_, index) => ({ length: 64, offset: 64 * index, index })} initialNumToRender={12} maxToRenderPerBatch={12} windowSize={7}
             ListEmptyComponent={<Text style={styles.empty}>暂无章节目录</Text>}
             renderItem={({ item, index }) => <Pressable onPress={() => item.id === chapterId ? close() : onChapter(item)} disabled={busy || item.locked} accessibilityRole="button" accessibilityLabel={`${item.title}${item.locked ? '，未解锁' : item.id === chapterId ? '，正在阅读' : ''}`} accessibilityState={{ selected: item.id === chapterId, disabled: busy || !!item.locked }} style={({ pressed }) => [styles.chapterRow, item.id === chapterId && styles.currentChapter, item.locked && styles.disabled, pressed && styles.pressed]}>
-              <Text style={styles.chapterIndex}>{String(index + 1).padStart(2, '0')}</Text><Text numberOfLines={1} style={[styles.chapterTitle, item.id === chapterId && styles.activeText]}>{item.title}</Text><Text style={styles.chapterState}>{item.locked ? '未解锁' : item.id === chapterId ? '在读' : ''}</Text>
+              <Text style={styles.chapterIndex}>{String(index + 1).padStart(2, '0')}</Text><Text numberOfLines={2} style={[styles.chapterTitle, item.id === chapterId && styles.activeText]}>{item.title}</Text><Text style={styles.chapterState}>{item.locked ? '未解锁' : item.id === chapterId ? '在读' : '›'}</Text>
             </Pressable>} />
         </View> : panel === 'settings' ? <ScrollView style={styles.settings} contentContainerStyle={styles.settingsContent}>
           <View style={styles.panelHeading}><View style={styles.headingCopy}><Text style={styles.panelTitle}>阅读设置</Text><Text style={styles.caption}>找到舒服的阅读节奏</Text></View><Pressable style={styles.iconButton} onPress={() => setPanel('menu')} accessibilityRole="button" accessibilityLabel="收起阅读设置"><Icon name="close" /></Pressable></View>
@@ -107,14 +107,14 @@ export function ReaderControls(props: Props) {
 }
 
 const createStyles = (theme: AppTheme) => StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'space-between', backgroundColor: 'rgba(38, 33, 26, 0.22)' },
+  overlay: { flex: 1, justifyContent: 'space-between', backgroundColor: 'rgba(38, 33, 26, 0.24)' },
   topBar: { backgroundColor: theme.readerPaper, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.readerLine },
   topRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 6 },
   iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   bookTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: theme.readerInk, marginRight: 6 },
   shelfButton: { minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
   shelfLabel: { color: theme.success, fontSize: 12, fontWeight: '600' },
-  bottomBar: { backgroundColor: theme.readerPaper, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' },
+  bottomBar: { backgroundColor: theme.readerPaper, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   chapterNavigation: { paddingTop: 18, paddingBottom: 14, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   chapterButton: { minHeight: 48, paddingHorizontal: 12, justifyContent: 'center' },
   navigationText: { fontSize: 13, color: theme.readerInk },
@@ -131,7 +131,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   panelTitle: { color: theme.readerInk, fontSize: 18, fontWeight: '700' },
   catalog: { flexShrink: 1 },
   chapterRow: { height: 64, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.readerLine },
-  currentChapter: { backgroundColor: theme.successSoft },
+  currentChapter: { backgroundColor: theme.successSoft, borderRadius: 9, borderBottomWidth: 0 },
   chapterIndex: { color: theme.readerMuted, fontSize: 11, minWidth: 28, fontVariant: ['tabular-nums'] },
   chapterTitle: { flex: 1, fontSize: 14, color: theme.readerInk },
   chapterState: { color: theme.success, fontSize: 11 },

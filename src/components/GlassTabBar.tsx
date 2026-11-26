@@ -2,8 +2,8 @@ import { useAppTheme } from '../state/appearance';
 import { BlurView } from 'expo-blur';
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Tabs } from 'expo-router';
-import { ComponentProps, useEffect, useState } from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ComponentProps } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TabBarIcon, type TabBarIconName } from './TabBarIcon';
 import { useThemedStyles, type AppTheme } from './theme';
@@ -21,28 +21,17 @@ export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabB
   const styles = useThemedStyles(createStyles);
   const { theme, colorScheme } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const [pillWidth, setPillWidth] = useState(350);
-  const [lensPosition] = useState(() => new Animated.Value(state.index));
   const nativeGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
-  const itemWidth = (pillWidth - 20) / state.routes.length;
-
-  useEffect(() => {
-    Animated.spring(lensPosition, { toValue: state.index, friction: 8, tension: 80, useNativeDriver: Platform.OS !== 'web' }).start();
-  }, [lensPosition, state.index]);
 
   return (
     <View pointerEvents="box-none" style={[styles.container, { paddingBottom: Math.max(insets.bottom, 9) + 5 }]}>
-      <View style={styles.pill} onLayout={(event) => setPillWidth(event.nativeEvent.layout.width)}>
+      <View style={styles.pill}>
         {nativeGlass ? (
           <GlassView pointerEvents="none" glassEffectStyle="regular" colorScheme={colorScheme} style={styles.glassBackground} />
         ) : (
           <BlurView pointerEvents="none" tint={colorScheme === 'dark' ? 'systemUltraThinMaterialDark' : 'systemUltraThinMaterialLight'} intensity={75} style={styles.glassBackground} />
         )}
         <View pointerEvents="none" style={styles.surfaceTint} />
-        <View pointerEvents="none" style={styles.topHighlight} />
-        <Animated.View pointerEvents="none" style={[styles.activeLens, { width: itemWidth, transform: [{ translateX: Animated.multiply(lensPosition, itemWidth + 2) }] }]}>
-          {nativeGlass ? <GlassView glassEffectStyle="clear" colorScheme={colorScheme} style={styles.lensGlass} /> : <View style={styles.lensFill} />}
-        </Animated.View>
         <View style={styles.items}>
           {state.routes.map((route, index) => {
             const focused = state.index === index;
@@ -63,7 +52,7 @@ export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabB
                 onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
               >
                 <View style={styles.icon}>
-                  <TabBarIcon name={config.icon} color={focused ? theme.ink : theme.muted} focused={focused} />
+                  <TabBarIcon name={config.icon} color={focused ? theme.dark : theme.muted} focused={focused} />
                 </View>
                 <Text style={[styles.label, focused && styles.activeLabel]}>{config.label}</Text>
               </Pressable>
@@ -76,18 +65,14 @@ export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabB
 }
 
 const createStyles = (theme: AppTheme) => StyleSheet.create({
-  container: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: 20 },
-  pill: { width: '100%', maxWidth: 390, height: 66, borderRadius: 35, borderWidth: 1, borderColor: theme.glassBorder, shadowColor: '#514B40', shadowOpacity: 0.18, shadowRadius: 22, shadowOffset: { width: 0, height: 8 }, elevation: 12, overflow: 'hidden' },
+  container: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: 16 },
+  pill: { width: '100%', maxWidth: 390, height: 70, borderRadius: 25, borderWidth: 1, borderColor: theme.glassBorder, backgroundColor: theme.paper, shadowColor: '#514B40', shadowOpacity: 0.12, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 9, overflow: 'hidden' },
   glassBackground: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, borderRadius: 35 },
-  surfaceTint: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: theme.glassTint, borderRadius: 35 },
-  topHighlight: { position: 'absolute', top: 1, left: 25, right: 25, height: 1, backgroundColor: theme.glassHighlight },
-  items: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7, gap: 2 },
-  item: { flex: 1, height: 53, alignItems: 'center', justifyContent: 'center', borderRadius: 27 },
-  activeItem: { flex: 1, height: 53, alignItems: 'center', justifyContent: 'center', borderRadius: 27 },
-  activeLens: { position: 'absolute', top: 6, left: 7, height: 53, borderRadius: 27, borderWidth: 1, borderColor: theme.glassBorder, shadowColor: '#FFFFFF', shadowOpacity: 0.75, shadowRadius: 9, overflow: 'hidden' },
-  lensGlass: { flex: 1, borderRadius: 27 },
-  lensFill: { flex: 1, backgroundColor: theme.glassLens, borderRadius: 27 },
+  surfaceTint: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: theme.glassTint, borderRadius: 25 },
+  items: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 2 },
+  item: { flex: 1, height: 55, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
+  activeItem: { flex: 1, height: 55, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: theme.successSoft },
   icon: { width: 24, height: 24, marginBottom: 1 },
   label: { color: theme.muted, fontSize: 10, fontWeight: '600' },
-  activeLabel: { color: theme.ink, fontWeight: '800' },
+  activeLabel: { color: theme.dark, fontWeight: '700' },
 });

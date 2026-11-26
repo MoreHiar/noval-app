@@ -1,34 +1,32 @@
 import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Book } from '../domain/books';
-import { useThemedStyles, type AppTheme } from './theme';
+import type { Book } from '../domain/books';
 import { BookCover } from './BookCover';
+import { useThemedStyles, type AppTheme } from './theme';
 
 export function BookCard({ book, compact = false, sourceName }: { book: Book; compact?: boolean; sourceName?: string }) {
   const styles = useThemedStyles(createStyles);
-  return (
-    <Link href={{ pathname: '/book/[sourceId]/[bookId]', params: { sourceId: book.sourceId, bookId: book.id } }} asChild>
-      <Pressable style={StyleSheet.flatten([styles.card, compact && styles.compact])} accessibilityRole="button" accessibilityLabel={`查看${book.title}`}>
-        <BookCover book={book} />
-        <View style={styles.info}>
-          <Text style={styles.title} numberOfLines={1}>{book.title}</Text>
-          <Text style={styles.author} numberOfLines={1}>{book.author} · {book.category}</Text>
-          {!compact && <Text style={styles.summary} numberOfLines={2}>{book.summary}</Text>}
-          <Text style={styles.status}>{sourceName ? `${sourceName}${book.status === '状态未知' ? '' : ` · ${book.status}`}` : book.status}</Text>
-        </View>
-        <Text style={styles.chevron}>›</Text>
-      </Pressable>
-    </Link>
-  );
+  return <Link href={{ pathname: '/book/[sourceId]/[bookId]', params: { sourceId: book.sourceId, bookId: book.id } }} asChild>
+    <Pressable style={StyleSheet.flatten([styles.card, compact && styles.compact])} accessibilityRole="button" accessibilityLabel={`查看${book.title}`}>
+      <BookCover book={book} />
+      <View style={styles.info}>
+        <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
+        <Text style={styles.author} numberOfLines={2}>{book.author} · {book.category}</Text>
+        {!compact && <Text style={styles.status}>{book.status}</Text>}
+        {sourceName ? <Text style={styles.source} numberOfLines={1}>{sourceName}</Text> : compact ? <Text style={styles.status}>{book.status}</Text> : null}
+      </View>
+      {!compact && <Text style={styles.chevron}>›</Text>}
+    </Pressable>
+  </Link>;
 }
 
 const createStyles = (theme: AppTheme) => StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', padding: 13, backgroundColor: theme.paper, borderRadius: 18, marginBottom: 12, gap: 14 },
-  compact: { marginBottom: 10 },
-  info: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
-  title: { color: theme.ink, fontSize: 17, fontWeight: '700', marginBottom: 5 },
-  author: { color: theme.muted, fontSize: 12, marginBottom: 10 },
-  summary: { color: theme.muted, fontSize: 12, lineHeight: 18, marginBottom: 7 },
-  status: { color: theme.accent, fontSize: 11, fontWeight: '600' },
-  chevron: { color: theme.muted, fontSize: 26, paddingRight: 3 },
+  card: { flexDirection: 'row', flex: 1, alignItems: 'center', minHeight: 126, paddingVertical: 17, borderBottomWidth: 1, borderBottomColor: theme.line, gap: 15 },
+  compact: { borderBottomWidth: 0, minHeight: 126 },
+  info: { flex: 1, justifyContent: 'center', gap: 4, minWidth: 0 },
+  title: { color: theme.ink, fontSize: 16, fontWeight: '700', lineHeight: 23 },
+  author: { color: theme.muted, fontSize: 12, lineHeight: 19 },
+  status: { color: theme.muted, fontSize: 11, lineHeight: 17 },
+  source: { alignSelf: 'flex-start', color: theme.muted, backgroundColor: theme.secondary, fontSize: 10, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 5, overflow: 'hidden', marginTop: 2 },
+  chevron: { color: theme.muted, fontSize: 23, marginLeft: 2 },
 });

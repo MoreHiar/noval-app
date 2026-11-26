@@ -6,9 +6,9 @@ import { BookCover } from './BookCover';
 import { useThemedStyles, type AppTheme } from './theme';
 
 const INPUT = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
-const ROTATION = ['63deg', '59deg', '53deg', '43deg', '-8deg', '-43deg', '-53deg', '-59deg', '-63deg'];
-const SCALE = [0.62, 0.68, 0.75, 0.86, 1.15, 0.86, 0.75, 0.68, 0.62];
-const LIFT = [29, 26, 22, 16, -14, 16, 22, 26, 29];
+const ROTATION = ['-24deg', '-21deg', '-18deg', '-13deg', '0deg', '13deg', '18deg', '21deg', '24deg'];
+const SCALE = [0.63, 0.68, 0.74, 0.86, 1.28, 0.86, 0.74, 0.68, 0.63];
+const LIFT = [25, 21, 17, 12, -6, 12, 17, 21, 25];
 
 export function BookCarousel({ books, selectedIndex, onSelect }: {
   books: Book[];
@@ -37,8 +37,8 @@ export function BookCarousel({ books, selectedIndex, onSelect }: {
   }), [books.length, onSelect, selectedIndex]);
 
   const spread = Math.min(width * 0.39, 156);
-  const translate = [-spread * 1.42, -spread * 1.27, -spread * 1.05, -spread * 0.63, 0,
-    spread * 0.63, spread * 1.05, spread * 1.27, spread * 1.42];
+  const translate = [-spread * 1.75, -spread * 1.55, -spread * 1.3, -spread * 0.85, 0,
+    spread * 0.85, spread * 1.3, spread * 1.55, spread * 1.75];
 
   return (
     <View
@@ -50,6 +50,7 @@ export function BookCarousel({ books, selectedIndex, onSelect }: {
       <View style={styles.lightBeam} />
       <View style={styles.floorShadow} />
       {books.map((book, index) => {
+        if (Math.abs(index - selectedIndex) > 4) return null;
         const delta = Animated.subtract(index, progress);
         const openBook = () => router.push({ pathname: '/book/[sourceId]/[bookId]', params: { sourceId: book.sourceId, bookId: book.id } });
         return (
@@ -109,11 +110,11 @@ export function BookCarousel({ books, selectedIndex, onSelect }: {
 }
 
 const createStyles = (theme: AppTheme) => StyleSheet.create({
-  stage: { height: 354, width: '100%', justifyContent: 'center', overflow: 'hidden' },
-  lightBeam: { position: 'absolute', width: '42%', height: 290, left: '30%', top: 9, backgroundColor: theme.beam, opacity: 0.6, transform: [{ skewX: '-16deg' }] },
-  floorShadow: { position: 'absolute', width: '75%', height: 23, left: '12.5%', bottom: 52, borderRadius: 100, backgroundColor: '#8D867733', transform: [{ scaleY: 0.7 }] },
-  stageBottomLine: { position: 'absolute', bottom: 49, width: '100%', height: 1, backgroundColor: theme.line },
-  bookPosition: { position: 'absolute', top: 74, width: 108, height: 212 },
+  stage: { height: 296, width: '100%', justifyContent: 'center', overflow: 'hidden' },
+  lightBeam: { position: 'absolute', width: '42%', height: 240, left: '30%', top: 2, backgroundColor: theme.beam, opacity: 0.45, transform: [{ skewX: '-16deg' }] },
+  floorShadow: { position: 'absolute', width: '75%', height: 20, left: '12.5%', bottom: 28, borderRadius: 100, backgroundColor: '#8D867733', transform: [{ scaleY: 0.7 }] },
+  stageBottomLine: { position: 'absolute', bottom: 25, width: '100%', height: 1, backgroundColor: theme.line },
+  bookPosition: { position: 'absolute', top: 35, width: 108, height: 212 },
   bookTouch: { width: 108, height: 212, flexDirection: 'row', shadowColor: '#444038', shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 6, height: 12 }, elevation: 9 },
   spine: { width: 10, borderTopLeftRadius: 3, borderBottomLeftRadius: 3, paddingHorizontal: 3, justifyContent: 'space-between', paddingVertical: 13 },
   spineRule: { height: 1, backgroundColor: '#FFFFFFAA' },

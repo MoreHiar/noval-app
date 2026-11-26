@@ -7,6 +7,7 @@ import { parseRuleSource, readSourceJson, ruleSourceExample, ruleSourceId } from
 import { useLibrary } from '../state/library';
 import { Page } from './Page';
 import { SourceButton, SourceMessage, useSourceStyles } from './SourceControls';
+import { useThemedStyles, type AppTheme } from './theme';
 
 function extraFields(document: RuleSourceDocument) {
   const fields: Record<string, unknown> = { ...document };
@@ -15,6 +16,7 @@ function extraFields(document: RuleSourceDocument) {
 }
 
 export function SourceEditor({ entry }: { entry?: RuleManagedSource }) {
+  const styles = useThemedStyles(createStyles);
   const s = useSourceStyles();
   const { theme } = useAppTheme();
   const { saveSource } = useLibrary();
@@ -51,36 +53,38 @@ export function SourceEditor({ entry }: { entry?: RuleManagedSource }) {
 
   return (
     <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Page title={entry ? '编辑书源' : '新增书源'} eyebrow="SOURCE DETAILS">
-        <Text style={s.helper}>使用「阅读 / Legado」规则书源格式，按网站配置搜索、详情、目录及正文规则。</Text>
-        <Text style={s.label}>书源名称 · bookSourceName</Text>
+      <Page title={entry ? '编辑书源' : '新增书源'} eyebrow="书源配置 / 阅读与 Legado 格式">
+        <Text style={s.label}>书源名称</Text>
         <TextInput placeholderTextColor={theme.muted} style={s.input} value={name} onChangeText={setName} editable={!busy} placeholder="为书源起个名字" accessibilityLabel="书源名称" />
-        <Text style={s.label}>书源地址 · bookSourceUrl</Text>
+        <Text style={s.label}>书源地址</Text>
         <TextInput placeholderTextColor={theme.muted} style={s.input} value={url} onChangeText={setUrl} editable={!busy} placeholder="https://www.example.com" autoCapitalize="none" autoCorrect={false} accessibilityLabel="书源地址" />
-        <Text style={s.helper}>书源地址用于识别重复项；通常填写网站首页。</Text>
-        <Text style={s.label}>分组 · bookSourceGroup</Text>
+        <Text style={[s.helper, styles.urlHint]}>通常填写网站首页，用于识别重复书源。</Text>
+        <Text style={s.label}>分组（可选）</Text>
         <TextInput placeholderTextColor={theme.muted} style={s.input} value={group} onChangeText={setGroup} editable={!busy} placeholder="例如：正版、玄幻" accessibilityLabel="书源分组" />
-        <Text style={s.label}>说明 · bookSourceComment</Text>
-        <TextInput placeholderTextColor={theme.muted} style={s.input} value={description} onChangeText={setDescription} editable={!busy} multiline placeholder="书源使用说明" accessibilityLabel="书源说明" />
-        <View style={s.switchRow}>
-          <View style={s.switchCopy}><Text style={s.switchLabel}>启用书源</Text><Text style={s.switchHint}>保存到 enabled 字段，导出时保持一致。</Text></View>
-          <Switch value={enabled} onValueChange={setEnabled} disabled={busy} accessibilityLabel="启用书源" thumbColor={theme.paper} trackColor={{ true: theme.accent }} />
+        <Text style={s.label}>说明（可选）</Text>
+        <TextInput placeholderTextColor={theme.muted} style={[s.input, styles.description]} value={description} onChangeText={setDescription} editable={!busy} multiline placeholder="书源使用说明" accessibilityLabel="书源说明" />
+        <View style={[s.switchRow, styles.enabledRow]}>
+          <View style={s.switchCopy}><Text style={s.switchLabel}>启用书源</Text><Text style={s.switchHint}>启用后参与搜索，导出时保留启用状态。</Text></View>
+          <Switch value={enabled} onValueChange={setEnabled} disabled={busy} accessibilityLabel="启用书源" thumbColor={theme.paper} trackColor={{ true: theme.dark }} />
         </View>
         <View style={styles.contentHeading}><Text style={s.sectionTitle}>规则与其他配置</Text>{!entry && <SourceButton secondary onPress={loadExample} disabled={busy}>填入示例</SourceButton>}</View>
-        <Text style={s.helper}>JSON 中保留 searchUrl、ruleSearch、ruleBookInfo、ruleToc、ruleContent，以及请求头、登录和其他原始字段。上方名称、地址、分组、说明及开关由表单保存。</Text>
+        <Text style={s.helper}>JSON 中保留搜索、详情、目录、正文规则和其他原始字段。名称、地址、分组、说明及启用状态由上方表单保存。</Text>
         <TextInput placeholderTextColor={theme.muted} style={[s.input, s.editor]} value={content} onChangeText={setContent} editable={!busy} multiline autoCapitalize="none" autoCorrect={false} textAlignVertical="top" accessibilityLabel="书源规则 JSON" />
-        <Text style={s.helper}>当前支持配置管理和导入导出；在线解析及脚本运行尚未接入。</Text>
+        <Text style={s.helper}>支持「阅读 / Legado」格式。规则字段包括 searchUrl、ruleSearch、ruleBookInfo、ruleToc、ruleContent；在线解析及脚本运行仍在接入中。</Text>
         {error ? <SourceMessage error>{error}</SourceMessage> : null}
         <View style={s.actions}>
-          <SourceButton onPress={save} disabled={busy}>{busy ? '保存中…' : '保存书源'}</SourceButton>
           <SourceButton secondary onPress={() => router.dismissTo('/sources')} disabled={busy}>取消</SourceButton>
+          <SourceButton onPress={save} disabled={busy}>{busy ? '保存中…' : '保存书源'}</SourceButton>
         </View>
       </Page>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   fill: { flex: 1 },
+  urlHint: { marginTop: -12, marginBottom: 20 },
+  description: { minHeight: 80, textAlignVertical: 'top' },
+  enabledRow: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.line, marginTop: 3, marginBottom: 22, paddingVertical: 17 },
   contentHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
 });

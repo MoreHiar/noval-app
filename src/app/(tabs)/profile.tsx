@@ -18,15 +18,20 @@ export default function ProfileScreen() {
   const { shelf, sourceDefinitions } = useLibrary();
   const sources = sourceDefinitions.filter(isRuleSource).filter(entry => entry.enabled);
   return (
-    <Page title="我的阅读" eyebrow="PERSONAL SPACE">
-      <View style={styles.brandRow}>
-        <BrandLogo size={52} />
-        <View><Text style={styles.brandName}>Noval 阅读</Text><Text style={styles.brandCaption}>一页一世界</Text></View>
-      </View>
+    <Page title="我的阅读" eyebrow="给自己，留一点阅读的时间" tabbed>
       <View style={styles.card}>
-        <Text style={styles.greeting}>让故事，慢慢发生。</Text>
+        <View style={styles.arcOne} pointerEvents="none" /><View style={styles.arcTwo} pointerEvents="none" /><View style={styles.arcThree} pointerEvents="none" />
+        <Text style={styles.quote}>“</Text>
+        <Text style={styles.greeting}>让故事，{`\n`}慢慢发生。</Text>
         <Text style={styles.description}>你的阅读空间已经准备好了。</Text>
       </View>
+      <View style={styles.stats}>
+        <View style={styles.stat}><Text style={styles.value}>{shelf.length}</Text><Text style={styles.label}>书架藏书</Text></View>
+        <View style={styles.divider} />
+        <View style={styles.stat}><Text style={styles.value}>{sources.length}</Text><Text style={styles.label}>已启用书源</Text></View>
+      </View>
+      <View style={styles.localNote}><Text style={styles.bookmark}>♧</Text><View><Text style={styles.localTitle}>下次打开，接着读</Text><Text style={styles.note}>阅读进度自动保存在本机，{`\n`}打开书籍即可继续阅读。</Text></View></View>
+      <View style={styles.signature}><BrandLogo size={32} /><Text style={styles.signatureName}>noval.</Text><Text style={styles.signatureTag}>ONE MORE PAGE, ONE MORE WORLD.</Text></View>
       <View style={styles.appearance}>
         <Text style={styles.sectionTitle}>外观</Text>
         <Text style={styles.appearanceHint}>当前为{colorScheme === 'dark' ? '深色' : '浅色'}模式 · 选择后自动保存</Text>
@@ -42,29 +47,30 @@ export default function ProfileScreen() {
         </View>
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       </View>
-      <View style={styles.stats}>
-        <View style={styles.stat}><Text style={styles.value}>{shelf.length}</Text><Text style={styles.label}>书架藏书</Text></View>
-        <View style={styles.divider} />
-        <View style={styles.stat}><Text style={styles.value}>{sources.length}</Text><Text style={styles.label}>已启用书源</Text></View>
-      </View>
-      <Text style={styles.note}>阅读进度自动保存在本机，打开书籍即可继续阅读。</Text>
     </Page>
   );
 }
 
 const createStyles = (theme: AppTheme) => StyleSheet.create({
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24 },
-  brandName: { color: theme.ink, fontSize: 21, fontWeight: '800', letterSpacing: 0.5 },
-  brandCaption: { color: theme.muted, fontSize: 12, marginTop: 5, letterSpacing: 2 },
-  card: { backgroundColor: theme.dark, padding: 27, borderRadius: 20, minHeight: 145, justifyContent: 'center' },
-  greeting: { color: 'white', fontSize: 22, fontWeight: '800', marginBottom: 9 },
-  description: { color: '#CDD5CF', fontSize: 13 },
-  stats: { flexDirection: 'row', backgroundColor: theme.paper, borderRadius: 17, marginTop: 18, paddingVertical: 22 },
+  card: { backgroundColor: theme.dark, padding: 25, borderRadius: 20, minHeight: 208, justifyContent: 'center', overflow: 'hidden' },
+  arcOne: { position: 'absolute', width: 180, height: 180, borderRadius: 90, borderWidth: 17, borderColor: '#FFFFFF10', right: -48, bottom: -76 },
+  arcTwo: { position: 'absolute', width: 145, height: 145, borderRadius: 73, borderWidth: 14, borderColor: '#FFFFFF12', right: -32, bottom: -60 },
+  arcThree: { position: 'absolute', width: 108, height: 108, borderRadius: 54, borderWidth: 10, borderColor: '#FFFFFF12', right: -12, bottom: -42 },
+  quote: { color: '#B9D3BA', fontSize: 40, fontFamily: 'serif', lineHeight: 43 },
+  greeting: { color: '#FFFFFF', fontSize: 23, lineHeight: 37, fontFamily: 'serif', marginTop: 10, marginBottom: 14 },
+  description: { color: '#E7ECE6', fontSize: 12 },
+  stats: { flexDirection: 'row', backgroundColor: theme.paper, borderRadius: 17, borderWidth: 1, borderColor: theme.line, marginTop: 18, paddingVertical: 24 },
   stat: { flex: 1, alignItems: 'center' },
-  value: { color: theme.ink, fontSize: 26, fontWeight: '800', marginBottom: 6 },
-  label: { color: theme.muted, fontSize: 11 },
+  value: { color: theme.ink, fontSize: 28, fontFamily: 'serif', marginBottom: 6 },
+  label: { color: theme.muted, fontSize: 12 },
   divider: { width: 1, backgroundColor: theme.line },
-  appearance: { marginTop: 26, backgroundColor: theme.paper, padding: 18, borderRadius: 18 },
+  localNote: { flexDirection: 'row', gap: 14, marginTop: 30, paddingHorizontal: 5 },
+  bookmark: { color: theme.dark, fontSize: 23, width: 22 },
+  localTitle: { color: theme.ink, fontSize: 14, fontWeight: '700', marginBottom: 6 },
+  signature: { alignItems: 'center', marginTop: 54, marginBottom: 34, gap: 5 },
+  signatureName: { color: theme.muted, fontSize: 30, fontFamily: 'serif', fontStyle: 'italic' },
+  signatureTag: { color: theme.muted, fontSize: 9, letterSpacing: 2 },
+  appearance: { backgroundColor: theme.paper, padding: 18, borderRadius: 18, borderWidth: 1, borderColor: theme.line },
   sectionTitle: { color: theme.ink, fontSize: 18, fontWeight: '700', marginBottom: 7 },
   appearanceHint: { color: theme.muted, fontSize: 12, lineHeight: 20, marginBottom: 14 },
   appearanceOption: { minHeight: 74, paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.line, marginBottom: 8 },
@@ -78,5 +84,5 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: theme.accent },
   pressed: { opacity: 0.65 },
   error: { color: theme.danger, fontSize: 12, lineHeight: 20, marginTop: 8 },
-  note: { color: theme.muted, textAlign: 'center', fontSize: 12, marginTop: 26 },
+  note: { color: theme.muted, fontSize: 12, lineHeight: 22 },
 });

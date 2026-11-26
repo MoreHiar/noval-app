@@ -62,24 +62,26 @@ export default function DiscoverScreen() {
     <>
     <FlatList
       style={styles.page}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 22 }]}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: Math.max(insets.bottom + 116, 130) }]}
       data={books}
       keyExtractor={({ book }) => `${book.sourceId}/${book.id}`}
       renderItem={({ item }) => <BookCard book={item.book} sourceName={item.sourceName} />}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={<View>
-      <View style={styles.heading}><Text style={styles.eyebrow}>DISCOVER STORIES</Text><Text style={styles.title}>发现好书</Text></View>
-      <View style={styles.search}><Text style={styles.icon}>⌕</Text><TextInput style={styles.input} value={query} onChangeText={text => { setQuery(text); setShowDetails(false); }} placeholder="搜索书名或作者" placeholderTextColor="#A4AAA3" accessibilityLabel="搜索书籍" autoCorrect={false} returnKeyType="search" onSubmitEditing={() => setAttempt(value => value + 1)} /></View>
+      <View style={styles.heading}><Text style={styles.eyebrow}>搜索 / 书名与作者</Text><Text style={styles.title}>寻找下一本好书</Text></View>
+      <View style={styles.search}><TabBarIcon name="search" color={theme.muted} size={19} /><TextInput style={styles.input} value={query} onChangeText={text => { setQuery(text); setShowDetails(false); }} placeholder="搜索书名或作者" placeholderTextColor={theme.muted} accessibilityLabel="搜索书籍" autoCorrect={false} returnKeyType="search" onSubmitEditing={() => setAttempt(value => value + 1)} /></View>
       <Pressable style={styles.sourcePickerButton} onPress={() => { setSourceFilter(''); setSourcePickerOpen(true); }} accessibilityRole="button" accessibilityLabel={`搜索书源：${selectedSource?.info.name ?? '全部书源'}`} accessibilityState={{ expanded: sourcePickerOpen }}>
-        <TabBarIcon name="sources" color={theme.accent} size={18} />
+        <TabBarIcon name="sources" color={theme.dark} size={17} />
         <Text style={styles.sourcePickerLabel} numberOfLines={1}>{selectedSource?.info.name ?? '全部书源'}</Text>
+        <Text style={styles.sourcePickerCount}>{activeSources.length} 个已启用</Text>
         <Text style={styles.sourcePickerArrow}>⌄</Text>
       </Pressable>
-      <Text style={styles.caption} accessibilityLiveRegion="polite">{query.trim() ? `${books.length - summary.demoBooks} 本在线结果 · ${loading ? `正在搜索 ${summary.settled}/${total}` : `${summary.matched} 个书源有结果 · ${summary.empty} 个未匹配 · ${summary.failed} 个失败 · ${summary.unsupported} 个规则未支持`}${summary.demoBooks ? ` · ${summary.demoBooks} 本离线示例` : ''}` : `${summary.demoBooks} 本离线示例`}</Text>
-      {!!query.trim() && onlineResults.length > 0 && <View style={styles.errorPanel}>
-        <Pressable onPress={() => setShowDetails(value => !value)} accessibilityRole="button" accessibilityState={{ expanded: showDetails }}><Text style={styles.error}>查看各书源搜索情况{errors.length ? `（${errors.length} 个失败或未支持）` : ''} {showDetails ? '⌃' : '⌄'}</Text></Pressable>
+      <Text style={styles.caption} accessibilityLiveRegion="polite">{query.trim() ? `找到 ${books.length} 本 · ${loading ? `正在搜索 ${summary.settled}/${total} 个书源` : `${summary.matched} 个书源有结果`}` : summary.demoBooks ? `${summary.demoBooks} 本离线示例` : '输入书名或作者开始搜索'}</Text>
+      {!!query.trim() && (onlineResults.length > 0 || loading) && <View style={styles.errorPanel}>
+        <Pressable style={styles.statusButton} onPress={() => setShowDetails(value => !value)} accessibilityRole="button" accessibilityState={{ expanded: showDetails }}><Text style={styles.statusButtonText}>{showDetails ? '▾' : '▸'}  查看各书源搜索情况{errors.length ? ` · ${errors.length} 个失败或未支持` : ''}</Text></Pressable>
+        {showDetails && <Text style={styles.errorDetail}>{summary.matched} 个有结果 · {summary.empty} 个未匹配 · {summary.failed} 个失败 · {summary.unsupported} 个规则未支持{summary.demoBooks ? ` · ${summary.demoBooks} 本离线示例` : ''}</Text>}
         {showDetails && onlineResults.map(result => <Text key={result.source.info.id} style={styles.errorDetail}>{result.source.info.name}：{result.error ?? (result.books.length ? `找到 ${result.books.length} 本` : '已响应，未提取到匹配结果')}</Text>)}
-        {!loading && <Pressable onPress={() => setAttempt(value => value + 1)} accessibilityRole="button"><Text style={styles.retry}>重新搜索</Text></Pressable>}
+        {showDetails && !loading && <Pressable onPress={() => setAttempt(value => value + 1)} accessibilityRole="button" style={styles.retryButton}><Text style={styles.retry}>重新搜索</Text></Pressable>}
       </View>}
       </View>}
       ListEmptyComponent={<Text style={styles.empty}>{loading ? '正在搜索，请稍候…' : !sources.length && query.trim() ? '请先在「书源」中导入并启用网络书源。' : summary.completed === 0 && total > 0 && query.trim() ? '所选书源未能完成搜索，请展开上方原因。' : query.trim() ? `所选书源未检索到“${query.trim()}”。可尝试缩短关键词或选择其他书源。${errors.length ? '部分书源未完成搜索，详见上方搜索情况。' : ''}` : '输入书名或作者开始搜索'}</Text>}
@@ -88,7 +90,7 @@ export default function DiscoverScreen() {
       <View style={styles.pickerBackdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setSourcePickerOpen(false)} accessibilityLabel="关闭书源选择" />
         <View style={[styles.pickerSheet, { paddingBottom: insets.bottom + 16 }]} accessibilityViewIsModal>
-          <View style={styles.pickerHeading}><Text style={styles.pickerTitle}>选择搜索书源</Text><Pressable onPress={() => setSourcePickerOpen(false)} accessibilityRole="button" accessibilityLabel="关闭书源选择" style={styles.pickerClose}><Text style={styles.pickerCloseText}>×</Text></Pressable></View>
+          <View style={styles.pickerHeading}><View><Text style={styles.pickerTitle}>选择搜索书源</Text><Text style={styles.pickerCaption}>仅显示已启用的书源</Text></View><Pressable onPress={() => setSourcePickerOpen(false)} accessibilityRole="button" accessibilityLabel="关闭书源选择" style={styles.pickerClose}><Text style={styles.pickerCloseText}>×</Text></Pressable></View>
           <View style={styles.pickerSearch}><TabBarIcon name="search" color={theme.muted} size={18} /><TextInput style={styles.pickerInput} value={sourceFilter} onChangeText={setSourceFilter} placeholder="查找书源" placeholderTextColor={theme.muted} accessibilityLabel="查找书源" autoCorrect={false} /></View>
           <FlatList
             data={sourceOptions}
@@ -110,26 +112,29 @@ export default function DiscoverScreen() {
 
 const createStyles = (theme: AppTheme) => StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.background },
-  content: { paddingHorizontal: 20, paddingBottom: 130, maxWidth: 760, width: '100%', alignSelf: 'center' },
-  heading: { marginBottom: 24 },
-  eyebrow: { color: theme.accent, fontSize: 12, fontWeight: '700', letterSpacing: 3, marginBottom: 8 },
-  title: { color: theme.ink, fontSize: 31, fontWeight: '800', letterSpacing: 1 },
-  search: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.paper, borderRadius: 14, paddingHorizontal: 16, height: 52, marginBottom: 10 },
-  icon: { color: theme.accent, fontSize: 25, marginRight: 10 },
+  content: { paddingHorizontal: 24, maxWidth: 760, width: '100%', alignSelf: 'center' },
+  heading: { marginBottom: 26 },
+  eyebrow: { color: theme.muted, fontSize: 11, letterSpacing: 1.2, marginBottom: 8 },
+  title: { color: theme.ink, fontSize: 27, lineHeight: 36, fontWeight: '700' },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.paper, borderRadius: 12, borderWidth: 1, borderColor: theme.line, paddingHorizontal: 16, height: 50, marginBottom: 12 },
   input: { flex: 1, color: theme.ink, fontSize: 14, height: '100%', minWidth: 0 },
-  sourcePickerButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, marginBottom: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.paper },
-  sourcePickerLabel: { flex: 1, minWidth: 0, color: theme.ink, fontSize: 13, fontWeight: '600' },
-  sourcePickerArrow: { color: theme.muted, fontSize: 21, marginTop: -5 },
-  caption: { color: theme.muted, fontSize: 12, marginBottom: 14, lineHeight: 19 },
-  errorPanel: { marginBottom: 16 },
-  error: { color: theme.accent, paddingVertical: 10 },
+  sourcePickerButton: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 32 },
+  sourcePickerLabel: { flex: 1, minWidth: 0, color: theme.dark, fontSize: 13, fontWeight: '600' },
+  sourcePickerCount: { color: theme.dark, fontSize: 11 },
+  sourcePickerArrow: { color: theme.dark, fontSize: 20, marginTop: -5 },
+  caption: { color: theme.muted, fontSize: 12, marginBottom: 13, lineHeight: 21 },
+  errorPanel: { marginBottom: 13, backgroundColor: theme.secondary, borderRadius: 12, paddingHorizontal: 12 },
+  statusButton: { minHeight: 44, justifyContent: 'center' },
+  statusButtonText: { color: theme.dark, fontSize: 12, fontWeight: '600' },
   errorDetail: { color: theme.muted, fontSize: 12, lineHeight: 19, marginBottom: 8 },
-  retry: { color: theme.accent, fontWeight: '600', paddingVertical: 10 },
+  retryButton: { minHeight: 44, justifyContent: 'center' },
+  retry: { color: theme.dark, fontWeight: '600' },
   empty: { color: theme.muted, textAlign: 'center', paddingVertical: 30 },
   pickerBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#202A2766' },
-  pickerSheet: { width: '100%', maxWidth: 760, maxHeight: '80%', alignSelf: 'center', backgroundColor: theme.background, borderTopLeftRadius: 12, borderTopRightRadius: 12, paddingHorizontal: 20, paddingTop: 18 },
+  pickerSheet: { width: '100%', maxWidth: 760, maxHeight: '80%', alignSelf: 'center', backgroundColor: theme.readerPaper, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 20 },
   pickerHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   pickerTitle: { color: theme.ink, fontSize: 18, fontWeight: '700' },
+  pickerCaption: { color: theme.muted, fontSize: 12, marginTop: 5 },
   pickerClose: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   pickerCloseText: { color: theme.muted, fontSize: 27 },
   pickerSearch: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 46, paddingHorizontal: 14, marginBottom: 8, backgroundColor: theme.paper, borderRadius: 8, borderWidth: 1, borderColor: theme.line },

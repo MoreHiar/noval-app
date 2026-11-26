@@ -15,9 +15,9 @@ export function BookCover({ book, large = false, style }: { book: Book; large?: 
         <Image key={uri} source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`${book.title}封面`} onError={() => setFailed(current => ({ key, urls: [...(current.key === key ? current.urls : []), uri] }))} />
       ) : (
         <>
-          <View style={styles.rule} />
-          <Text style={[styles.title, large && styles.largeTitle]} numberOfLines={3}>{book.title}</Text>
-          <Text style={styles.author} numberOfLines={1}>{book.author}</Text>
+          <Text style={styles.series}>NOVAL / STORIES</Text>
+          <View style={styles.art} pointerEvents="none"><View style={styles.orbit} /><View style={styles.orbitSmall} /></View>
+          <View><Text style={[styles.title, large && styles.largeTitle]} numberOfLines={large ? 3 : 2}>{book.title}</Text><Text style={styles.author} numberOfLines={1}>{book.author} 著</Text></View>
         </>
       )}
     </View>
@@ -25,10 +25,13 @@ export function BookCover({ book, large = false, style }: { book: Book; large?: 
 }
 
 const styles = StyleSheet.create({
-  cover: { width: 82, height: 112, borderRadius: 8, padding: 10, justifyContent: 'space-between', overflow: 'hidden' },
-  large: { width: 120, height: 165, borderRadius: 10, padding: 15 },
-  rule: { height: 2, width: 22, backgroundColor: '#FFFFFF90' },
-  title: { color: 'white', fontSize: 17, fontWeight: '700', lineHeight: 23 },
-  largeTitle: { fontSize: 22, fontWeight: '800', lineHeight: 30 },
-  author: { color: '#FFFFFFCC', fontSize: 10 },
+  cover: { width: 70, height: 96, borderRadius: 4, padding: 7, justifyContent: 'space-between', overflow: 'hidden' },
+  large: { width: 116, height: 164, borderRadius: 5, padding: 11 },
+  series: { color: '#F5EFE0', fontSize: 5, letterSpacing: 1.1, fontWeight: '700' },
+  art: { position: 'absolute', top: 25, right: 0, bottom: 0, left: 8, opacity: 0.28 },
+  orbit: { width: 160, height: 160, borderWidth: 1, borderColor: '#FFFFFF', borderRadius: 80, transform: [{ rotate: '-18deg' }] },
+  orbitSmall: { position: 'absolute', top: 22, left: 20, width: 100, height: 100, borderWidth: 1, borderColor: '#FFFFFF', borderRadius: 50 },
+  title: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', lineHeight: 17 },
+  largeTitle: { fontSize: 21, lineHeight: 27 },
+  author: { color: '#F5EFE0', fontSize: 7, marginTop: 5 },
 });

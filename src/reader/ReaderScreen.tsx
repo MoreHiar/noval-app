@@ -185,7 +185,7 @@ function ReadingCanvas({ data, sourceId, bookId, preferencesState }: { data: Loa
   const outgoingStyle = !transition ? undefined : transition.mode === 'fade' ? { opacity: animation.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) } : { transform: [{ translateX: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -size.width * transition.direction] }) }] };
 
   return <View style={[styles.page, { paddingTop: Math.max(insets.top, 12), paddingBottom: Math.max(insets.bottom, 10), paddingLeft: insets.left, paddingRight: insets.right }]}>
-    <View style={styles.header}><Text style={styles.bookTitle} numberOfLines={1}>{book?.title ?? '阅读'}</Text><Text style={styles.chapterTitle} numberOfLines={1}>{chapter.title}</Text></View>
+    <View style={styles.header}><Text style={styles.bookTitle} numberOfLines={1}>{book?.title ?? '阅读'} · 第 {Math.max(chapterIndex + 1, 1)} 章</Text><Text style={styles.chapterTitle} numberOfLines={2}>{chapter.title}</Text></View>
     <View style={styles.body}>
       <View style={styles.viewport} onLayout={event => {
         const { width, height } = event.nativeEvent.layout;
@@ -222,10 +222,10 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 22, backgroundColor: theme.readerControl, borderRadius: 12 },
   backButton: { position: 'absolute', minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' },
   backText: { color: theme.success, fontSize: 15 },
-  header: { paddingTop: 12, paddingBottom: 24, paddingHorizontal: 24, maxWidth: 680, width: '100%', alignSelf: 'center', flexDirection: 'row', gap: 20 },
-  bookTitle: { flex: 1, color: theme.readerMuted, fontSize: 11 },
-  chapterTitle: { flex: 1, color: theme.readerMuted, fontSize: 11, textAlign: 'right' },
-  body: { flex: 1, paddingHorizontal: 24, maxWidth: 680, width: '100%', alignSelf: 'center' },
+  header: { paddingTop: 20, paddingBottom: 26, paddingHorizontal: 24, maxWidth: 640, width: '100%', alignSelf: 'center', gap: 30 },
+  bookTitle: { color: theme.readerMuted, fontSize: 11 },
+  chapterTitle: { color: theme.readerInk, fontSize: 22, lineHeight: 32, fontFamily: 'serif' },
+  body: { flex: 1, paddingHorizontal: 24, maxWidth: 640, width: '100%', alignSelf: 'center' },
   viewport: { flex: 1, overflow: 'hidden' },
   touchZones: { ...StyleSheet.absoluteFill, flexDirection: 'row' },
   sideZone: { flex: 1 },
@@ -234,7 +234,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   textLayers: { flex: 1 },
   textLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: theme.readerBackground },
   measure: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 },
-  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 6, maxWidth: 680, width: '100%', alignSelf: 'center' },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 6, maxWidth: 640, width: '100%', alignSelf: 'center' },
   footerText: { color: theme.readerMuted, fontSize: 10, fontVariant: ['tabular-nums'] },
   error: { color: theme.danger, fontSize: 12, textAlign: 'center', paddingHorizontal: 24, paddingTop: 8 },
 });
