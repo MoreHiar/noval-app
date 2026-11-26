@@ -96,7 +96,7 @@ export default function SourceImportScreen() {
         {!preview && !message ? <View style={styles.hintCard}><Text style={styles.hintText}>支持「阅读 / Legado」格式的单个书源对象或数组。导入前会显示预览，已有书源默认保留。XIU2 分享页为 yuedu.xiu2.xyz，实际 JSON 地址是 yuedu.xiu2.xyz/shuyuan。</Text></View> : null}
         {storageError ? <SourceMessage error>{storageError}</SourceMessage> : null}
         {error ? <SourceMessage error>{error}</SourceMessage> : null}
-        {message ? <><SourceMessage>{message}</SourceMessage><View style={s.actions}><SourceButton onPress={() => router.dismissTo('/sources')}>返回书源列表</SourceButton></View></> : null}
+        {message ? <><SourceMessage>{message}</SourceMessage><View style={s.actions}><SourceButton onPress={() => router.dismissTo('/source')}>返回书源列表</SourceButton></View></> : null}
         {preview && <View style={styles.previewSection}>
           <View style={styles.previewHeading}><Text style={s.sectionTitle}>待导入 · {preview.length} 个书源</Text>{conflicts > 0 ? <Text style={styles.conflictPill}>{conflicts} 个重复</Text> : null}</View>
           {preview.slice(0, 30).map(({ document, enabled }) => (

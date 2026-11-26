@@ -41,7 +41,7 @@ export function SourceEditor({ entry }: { entry?: RuleManagedSource }) {
         enabled,
       });
       await saveSource(document, enabled, entry ? ruleSourceId(entry.document) : undefined);
-      router.dismissTo('/sources');
+      router.dismissTo('/source');
     } catch (cause) { setError(cause instanceof Error ? cause.message : '保存失败，请重试。'); }
     finally { setBusy(false); }
   };
@@ -73,7 +73,7 @@ export function SourceEditor({ entry }: { entry?: RuleManagedSource }) {
         <Text style={s.helper}>支持「阅读 / Legado」格式。规则字段包括 searchUrl、ruleSearch、ruleBookInfo、ruleToc、ruleContent；在线解析及脚本运行仍在接入中。</Text>
         {error ? <SourceMessage error>{error}</SourceMessage> : null}
         <View style={s.actions}>
-          <SourceButton secondary onPress={() => router.dismissTo('/sources')} disabled={busy}>取消</SourceButton>
+          <SourceButton secondary onPress={() => router.dismissTo('/source')} disabled={busy}>取消</SourceButton>
           <SourceButton onPress={save} disabled={busy}>{busy ? '保存中…' : '保存书源'}</SourceButton>
         </View>
       </Page>

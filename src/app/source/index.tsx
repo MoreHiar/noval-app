@@ -122,7 +122,7 @@ export default function SourcesScreen() {
           </View>
         }
         ListEmptyComponent={ready ? <View style={styles.empty}><Text style={styles.emptyTitle}>{sourceDefinitions.length ? '没有匹配的书源' : '添加第一个书源'}</Text><Text style={styles.emptyHint}>{sourceDefinitions.length ? '试试其他关键词或筛选条件。' : '从 JSON 地址、文件或粘贴内容导入。'}</Text></View> : !storageError ? <ActivityIndicator color={theme.dark} style={styles.loading} /> : undefined}
-        ListFooterComponent={<Text style={styles.runtimeHint}>已启用书源会参与搜索；暂支持简单 GET／POST 与 CSS／Legado 选择器。未支持的规则会在搜索页显示原因。在线目录、正文与脚本运行仍在接入中。</Text>}
+        ListFooterComponent={<Text style={styles.runtimeHint}>部分书源需要网站验证，或使用当前无法读取的规则。搜索失败时，可在搜索页查看各书源的具体原因。</Text>}
         renderItem={({ item }) => (
           <View style={[styles.source, !item.enabled && styles.disabledSource]}>
             <View style={styles.sourceHeading}>

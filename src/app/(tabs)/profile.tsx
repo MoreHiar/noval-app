@@ -1,6 +1,8 @@
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Page } from '../../components/Page';
 import { BrandLogo } from '../../components/BrandLogo';
+import { TabBarIcon } from '../../components/TabBarIcon';
 import { useThemedStyles, type AppTheme } from '../../components/theme';
 import { isRuleSource } from '../../sources/legado';
 import { useLibrary } from '../../state/library';
@@ -30,6 +32,7 @@ export default function ProfileScreen() {
         <View style={styles.divider} />
         <View style={styles.stat}><Text style={styles.value}>{sources.length}</Text><Text style={styles.label}>已启用书源</Text></View>
       </View>
+      <View style={styles.sourceSection}><Text style={styles.sectionTitle}>阅读与内容</Text><Pressable style={styles.sourceEntry} onPress={() => router.push('/source')} accessibilityRole="button" accessibilityLabel="书源管理"><View style={styles.sourceIcon}><TabBarIcon name="sources" color={styles.sourceIconText.color} size={18} /></View><View style={styles.sourceCopy}><Text style={styles.sourceEntryTitle}>书源管理</Text><Text style={styles.sourceEntryHint}>导入、启停与编辑小说和漫画书源</Text></View><Text style={styles.sourceChevron}>›</Text></Pressable></View>
       <View style={styles.localNote}><Text style={styles.bookmark}>♧</Text><View><Text style={styles.localTitle}>下次打开，接着读</Text><Text style={styles.note}>阅读进度自动保存在本机，{`\n`}打开书籍即可继续阅读。</Text></View></View>
       <View style={styles.signature}><BrandLogo size={32} /><Text style={styles.signatureName}>noval.</Text><Text style={styles.signatureTag}>ONE MORE PAGE, ONE MORE WORLD.</Text></View>
       <View style={styles.appearance}>
@@ -60,6 +63,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   greeting: { color: '#FFFFFF', fontSize: 23, lineHeight: 37, fontFamily: 'serif', marginTop: 10, marginBottom: 14 },
   description: { color: '#E7ECE6', fontSize: 12 },
   stats: { flexDirection: 'row', backgroundColor: theme.paper, borderRadius: 17, borderWidth: 1, borderColor: theme.line, marginTop: 18, paddingVertical: 24 },
+  sourceSection: { marginTop: 28 }, sourceEntry: { flexDirection: 'row', alignItems: 'center', minHeight: 72, borderBottomWidth: 1, borderBottomColor: theme.line, gap: 12 }, sourceIcon: { width: 36, height: 36, borderRadius: 7, backgroundColor: theme.secondary, alignItems: 'center', justifyContent: 'center' }, sourceIconText: { color: theme.dark }, sourceCopy: { flex: 1, minWidth: 0 }, sourceEntryTitle: { color: theme.ink, fontSize: 14, fontWeight: '700' }, sourceEntryHint: { color: theme.muted, fontSize: 11, marginTop: 4 }, sourceChevron: { color: theme.muted, fontSize: 22 },
   stat: { flex: 1, alignItems: 'center' },
   value: { color: theme.ink, fontSize: 28, fontFamily: 'serif', marginBottom: 6 },
   label: { color: theme.muted, fontSize: 12 },

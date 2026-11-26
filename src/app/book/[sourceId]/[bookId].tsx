@@ -58,7 +58,7 @@ function BookDetails({ sourceId, bookId }: { sourceId: string; bookId: string })
   </View>;
   const resumeChapter = progress ? chapters.find(chapter => chapter.id === progress.chapterId && !chapter.locked) : undefined;
   const start = resumeChapter ?? chapters.find(chapter => !chapter.locked);
-  const readerLink = (chapter: ChapterMeta, offset = 0) => ({ pathname: '/reader/[sourceId]/[bookId]/[chapterId]' as const, params: { sourceId, bookId, chapterId: chapter.id, offset: String(offset) } });
+  const readerLink = (chapter: ChapterMeta, offset = 0) => ({ pathname: book.mediaType === 'manga' ? '/comic/[sourceId]/[bookId]/[chapterId]' as const : '/reader/[sourceId]/[bookId]/[chapterId]' as const, params: { sourceId, bookId, chapterId: chapter.id, offset: String(offset) } });
 
   return <FlatList
     style={styles.page} contentContainerStyle={[styles.content, { paddingBottom: Math.max(42, insets.bottom + 30) }]} data={chapters} keyExtractor={chapter => chapter.id}
@@ -66,7 +66,7 @@ function BookDetails({ sourceId, bookId }: { sourceId: string; bookId: string })
     ListHeaderComponent={<>
       <View style={styles.head}>
         <BookCover book={book} large />
-        <View style={styles.meta}><Text style={styles.title}>{book.title}</Text><Text style={styles.author}>{book.author} 著</Text><Text style={styles.metaLine}>{book.category} · {book.status}</Text><Text style={styles.source}>来源：{source.info.name}</Text></View>
+        <View style={styles.meta}><Text style={styles.title}>{book.title}</Text><Text style={styles.author}>{book.author} 著</Text><Text style={styles.metaLine}>{book.mediaType === 'manga' ? '漫画' : '小说'} · {book.category} · {book.status}</Text><Text style={styles.source}>来源：{source.info.name}</Text></View>
       </View>
       <Text style={styles.sectionTitle}>内容简介</Text><Text style={styles.summary}>{book.summary || '暂无简介'}</Text>
       <View style={styles.actions}>
@@ -75,7 +75,7 @@ function BookDetails({ sourceId, bookId }: { sourceId: string; bookId: string })
       </View>
       {resumeChapter ? <Text style={styles.progress}>上次读到 · {resumeChapter.title}</Text> : null}
       {progressError ? <Text accessibilityRole="alert" style={styles.error}>{progressError}</Text> : null}
-      <View style={styles.chapterHeading}><View><Text style={styles.sectionTitle}>章节目录</Text><Text style={styles.count}>{catalogLoaded ? `共 ${chapters.length} 章` : '正在加载目录'}</Text></View>
+      <View style={styles.chapterHeading}><View><Text style={styles.sectionTitle}>{book.mediaType === 'manga' ? '漫画目录' : '章节目录'}</Text><Text style={styles.count}>{catalogLoaded ? `共 ${chapters.length} ${book.mediaType === 'manga' ? '话' : '章'}` : '正在加载目录'}</Text></View>
         <Pressable style={styles.refresh} onPress={retry} disabled={!catalogLoaded} accessibilityRole="button" accessibilityLabel="刷新目录"><Text style={styles.refreshText}>↻ 刷新</Text></Pressable>
       </View>
       {catalogError ? <View style={styles.catalogError}><Text accessibilityRole="alert" style={styles.error}>{catalogError}</Text><Pressable style={styles.retry} onPress={retry} accessibilityRole="button"><Text style={styles.retryText}>重试目录</Text></Pressable></View> : null}

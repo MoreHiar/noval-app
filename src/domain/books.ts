@@ -5,6 +5,7 @@ export type SourceInfo = {
   name: string;
   kind: SourceKind;
   description: string;
+  mediaType?: 'novel' | 'manga';
 };
 
 export type Book = {
@@ -18,6 +19,7 @@ export type Book = {
   accent: string;
   coverUrl?: string;
   coverFallbackUrl?: string;
+  mediaType?: 'novel' | 'manga';
 };
 
 export type ChapterMeta = {
@@ -30,6 +32,7 @@ export type ChapterMeta = {
 
 export type Chapter = ChapterMeta & {
   paragraphs: string[];
+  imageUrls?: string[];
   fontUrl?: string;
 };
 
@@ -45,7 +48,9 @@ export type ReadingProgress = {
 export type SourceAdapter = {
   info: SourceInfo;
   searchUnavailableReason?: string;
+  discoverUnavailableReason?: string;
   search(query: string, signal?: AbortSignal): Promise<Book[]>;
+  discover?(signal?: AbortSignal): Promise<Book[]>;
   getBook(bookId: string, signal?: AbortSignal): Promise<Book | null>;
   getChapters(bookId: string, signal?: AbortSignal): Promise<ChapterMeta[]>;
   getChapter(bookId: string, chapterId: string, signal?: AbortSignal): Promise<Chapter | null>;

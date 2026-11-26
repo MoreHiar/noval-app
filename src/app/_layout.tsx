@@ -29,10 +29,13 @@ function AppNavigation() {
       <LibraryProvider>
         <Stack screenOptions={{ headerStyle: { backgroundColor: theme.background }, headerTintColor: theme.ink, headerShadowVisible: false, contentStyle: { backgroundColor: theme.background } }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="search" options={{ headerShown: false }} />
+          <Stack.Screen name="source/index" options={{ title: '书源管理' }} />
           <Stack.Screen name="source/edit" options={{ title: '书源信息' }} />
           <Stack.Screen name="source/import" options={{ title: '导入书源' }} />
           <Stack.Screen name="book/[sourceId]/[bookId]" options={{ title: '书籍详情' }} />
           <Stack.Screen name="reader/[sourceId]/[bookId]/[chapterId]" options={{ headerShown: false, gestureEnabled: false, animation: 'none' }} />
+          <Stack.Screen name="comic/[sourceId]/[bookId]/[chapterId]" options={{ headerShown: false, gestureEnabled: false, animation: 'none' }} />
         </Stack>
         <SourceBrowser />
       </LibraryProvider>

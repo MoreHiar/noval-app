@@ -113,7 +113,7 @@ export function compileFieldRule(expression: unknown): (node: SearchNode) => str
     return node => node.format === 'json' ? replace(fields.reduce((value, field) => value.replace(field.token, field.path(node.value).map(jsonText).join(' ')), rule)) : '';
   }
   const output = rule.match(/(?:^|@)(text|textNodes|ownText|html|[\w-]+)$/);
-  const hasOutput = !!output && (output.index! > 0 || ['text', 'textNodes', 'ownText', 'html', 'href', 'src'].includes(rule));
+  const hasOutput = !!output && (output.index! > 0 || rule.startsWith('@') || ['text', 'textNodes', 'ownText', 'html', 'href', 'src'].includes(rule));
   const method = hasOutput ? output![1] : 'text';
   const path = hasOutput ? rule.slice(0, output!.index) : rule;
   const steps = path.trim() ? stages(path) : [];

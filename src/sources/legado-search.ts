@@ -16,12 +16,30 @@ import { loadBrowserPage } from './browser-session';
 import { createQidianReader } from './qidian-reader';
 import { createBrowserReader } from './browser-reader';
 import { isQingtianSearch, qingtianBookUrl, qingtianSearchRequest } from './qingtian-search';
+import { createRuleReader } from './rule-reader';
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
 const TIMEOUT_MS = 20000;
 const MAX_CACHED_BOOKS = 100;
 type RequestOptions = { method?: string; body?: string; charset?: string; headers?: unknown };
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export function firstExploreUrl(value: string): string {
+  const raw = value.trim();
+  if (!raw) throw new UnsupportedSearchRule('发现地址为空。');
+  let entry: unknown = raw;
+  if (raw.startsWith('[') || raw.startsWith('{')) {
+    try { entry = JSON5.parse(raw); }
+    catch { throw new UnsupportedSearchRule('发现地址配置不是有效的 JSON。'); }
+    if (Array.isArray(entry)) entry = entry[0];
+    if (record(entry)) entry = entry.url ?? entry.exploreUrl;
+  }
+  if (typeof entry !== 'string') throw new UnsupportedSearchRule('暂不支持此发现地址格式。');
+  const line = entry.split(/\r?\n|&&/).map(item => item.trim()).find(Boolean) ?? '';
+  const url = (line.includes('::') ? line.slice(line.indexOf('::') + 2) : line).trim();
+  if (!url || /\{\{\s*key\s*\}\}/i.test(url)) throw new UnsupportedSearchRule('发现地址不能依赖搜索关键词。');
+  return url;
+}
 
 function httpUrl(value: string, base: string): string {
   if (!value.trim()) throw new Error('搜索结果缺少书籍链接。');
@@ -111,7 +129,7 @@ async function resolveSearchRequest(document: RuleSourceDocument, keyword: strin
 }
 
 function compileSearch(document: RuleSourceDocument) {
-  if (document.bookSourceType !== undefined && document.bookSourceType !== 0) throw new UnsupportedSearchRule('搜索暂仅支持文本书源。');
+  if (document.bookSourceType !== undefined && ![0, 2].includes(document.bookSourceType)) throw new UnsupportedSearchRule('搜索暂仅支持文本和图片书源。');
   buildSearchRequest(document, 'test');
   const rules = browserSearch(document,'test') ? browserSearchRules(document) : searchRulesFor(document);
   const qingtian = isQingtianSearch(document);
@@ -135,15 +153,33 @@ function aborted(): Error {
 export function createLegadoSearchAdapter(document: RuleSourceDocument, getSavedBook?: (bookId: string) => Promise<Book | null>): SourceAdapter {
   const sourceId = ruleSourceId(document);
   const sourceUrl = document.bookSourceUrl.trim().replace(/\/$/, '');
-  const reader = isFanqieSourceId(sourceId) ? createFanqieReader(sourceId) : sourceUrl === 'https://www.jgwxs.com' ? createJgwxsReader(sourceId) : sourceUrl === 'https://book.washai.net' ? createWashaiReader(sourceId) : sourceUrl === BQG349_URL ? createBqg349Reader(sourceId) : isLegacyQidianSearch(document) ? createQidianReader(sourceId) : browserSearch(document,'test') ? createBrowserReader(document) : undefined;
+  const ruleReader = createRuleReader(document);
+  const reader = isFanqieSourceId(sourceId) ? createFanqieReader(sourceId) : sourceUrl === 'https://www.jgwxs.com' ? createJgwxsReader(sourceId) : sourceUrl === 'https://book.washai.net' ? createWashaiReader(sourceId) : sourceUrl === BQG349_URL ? createBqg349Reader(sourceId) : isLegacyQidianSearch(document) ? createQidianReader(sourceId) : browserSearch(document,'test') ? createBrowserReader(document) : ruleReader;
   const cache = new Map<string, Book>();
   let compiled: ReturnType<typeof compileSearch> | undefined;
   let searchUnavailableReason: string | undefined;
   try { compiled = compileSearch(document); }
   catch (cause) { searchUnavailableReason = cause instanceof Error ? cause.message : '暂不支持此搜索规则。'; }
+  let exploreAdapter: SourceAdapter | undefined;
+  let discoverUnavailableReason: string | undefined;
+  if (document.enabledExplore && document.exploreUrl && document.ruleExplore && !Array.isArray(document.ruleExplore)) {
+    try {
+      const exploreUrl = firstExploreUrl(document.exploreUrl);
+      exploreAdapter = createLegadoSearchAdapter({ ...document, searchUrl: exploreUrl, ruleSearch: document.ruleExplore,
+        enabledExplore: false, exploreUrl: undefined, ruleExplore: undefined }, getSavedBook);
+      discoverUnavailableReason = exploreAdapter.searchUnavailableReason;
+    } catch (cause) { discoverUnavailableReason = cause instanceof Error ? cause.message : '发现规则暂不可用。'; }
+  } else discoverUnavailableReason = '此书源没有可用的发现规则。';
   return {
-    info: { id: sourceId, name: document.bookSourceName, kind: 'legado', description: document.bookSourceComment ?? '' },
+    info: { id: sourceId, name: document.bookSourceName, kind: 'legado', description: document.bookSourceComment ?? '', mediaType: document.bookSourceType === 2 ? 'manga' : 'novel' },
     searchUnavailableReason,
+    discoverUnavailableReason,
+    ...(exploreAdapter && !discoverUnavailableReason ? { discover: async (signal?: AbortSignal) => {
+      const books = await exploreAdapter.search('homepage', signal);
+      for (const book of books) { cache.delete(book.id); cache.set(book.id, book); }
+      while (cache.size > MAX_CACHED_BOOKS) cache.delete(cache.keys().next().value!);
+      return books;
+    } } : {}),
     async search(query, signal) {
       if (signal?.aborted) throw aborted();
       if (!query.trim()) return [];
@@ -196,6 +232,7 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument, getSaved
             id, sourceId, title, author: compiled.author(item).slice(0, 256) || '未知作者',
             summary: compiled.intro(item).slice(0, 4000), category: compiled.kind(item).slice(0, 128) || '网络书源',
             status: '状态未知', accent: '#526C63',
+            ...(document.bookSourceType === 2 ? { mediaType: 'manga' as const } : {}),
             ...(coverUrl ? { coverUrl } : {}),
             ...(coverFallbackUrl ? { coverFallbackUrl } : {}),
           };
@@ -220,7 +257,7 @@ export function createLegadoSearchAdapter(document: RuleSourceDocument, getSaved
         signal?.removeEventListener('abort', cancel);
       }
     },
-    async getBook(bookId, signal) { return reader && !isFanqieSourceId(sourceId) ? reader.getBook(bookId,signal) : cache.get(bookId) ?? (await getSavedBook?.(bookId)) ?? (reader ? reader.getBook(bookId, signal) : null); },
+    async getBook(bookId, signal) { return reader && reader !== ruleReader && !isFanqieSourceId(sourceId) ? reader.getBook(bookId,signal) : cache.get(bookId) ?? (await getSavedBook?.(bookId)) ?? (reader ? reader.getBook(bookId, signal) : null); },
     async getChapters(bookId, signal) { return reader ? reader.getChapters(bookId, signal) : []; },
     async getChapter(bookId, chapterId, signal) { return reader ? reader.getChapter(bookId, chapterId, signal) : null; },
   };

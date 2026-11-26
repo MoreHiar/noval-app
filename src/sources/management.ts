@@ -11,7 +11,8 @@ export const bookKey = (book: Pick<Book, 'sourceId' | 'id'>) => `${book.sourceId
 function snapshotBook(value: unknown): Book {
   if (!isRecord(value) || !['id', 'sourceId', 'title', 'author', 'summary', 'category', 'accent'].every(key => typeof value[key] === 'string') ||
     !value.id || !value.sourceId || !value.title || !['连载中', '已完结', '状态未知'].includes(String(value.status)) ||
-    (value.coverUrl !== undefined && typeof value.coverUrl !== 'string') || (value.coverFallbackUrl !== undefined && typeof value.coverFallbackUrl !== 'string')) {
+    (value.coverUrl !== undefined && typeof value.coverUrl !== 'string') || (value.coverFallbackUrl !== undefined && typeof value.coverFallbackUrl !== 'string') ||
+    (value.mediaType !== undefined && !['novel', 'manga'].includes(String(value.mediaType)))) {
     throw new Error('书架书籍信息格式无效。');
   }
   const book = value as Book;
@@ -19,6 +20,7 @@ function snapshotBook(value: unknown): Book {
   return {
     id: book.id, sourceId: book.sourceId, title: book.title.slice(0, 512), author: book.author.slice(0, 256),
     summary: book.summary.slice(0, 4000), category: book.category.slice(0, 128), status: book.status, accent: book.accent.slice(0, 32),
+    ...(book.mediaType ? { mediaType: book.mediaType } : {}),
     ...(artwork(book.coverUrl) ? { coverUrl: artwork(book.coverUrl) } : {}),
     ...(artwork(book.coverFallbackUrl) ? { coverFallbackUrl: artwork(book.coverFallbackUrl) } : {}),
   };

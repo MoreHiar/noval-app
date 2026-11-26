@@ -11,9 +11,9 @@ import { useThemedStyles, type AppTheme } from './theme';
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 const tabs: Record<string, { label: string; icon: TabBarIconName }> = {
-  discover: { label: '搜索', icon: 'search' },
   index: { label: '书架', icon: 'bookshelf' },
-  sources: { label: '书源', icon: 'sources' },
+  novels: { label: '小说', icon: 'novels' },
+  comics: { label: '漫画', icon: 'comics' },
   profile: { label: '我的', icon: 'profile' },
 };
 
