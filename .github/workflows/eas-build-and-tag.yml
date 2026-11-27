@@ -56,10 +56,11 @@ jobs:
 
           eas build --platform "$PLATFORM" --profile "$PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/build.json"
           build_id="$(jq -er '.[0].id' "$RUNNER_TEMP/build.json")"
-          eas build:download --build-id "$build_id" --json > "$RUNNER_TEMP/download.json"
-          build_path="$(jq -er '.path' "$RUNNER_TEMP/download.json")"
-          cp "$build_path" "$ARTIFACT"
+          eas build:view "$build_id" --json > "$RUNNER_TEMP/build-details.json"
+          artifact_url="$(jq -er '.artifacts.applicationArchiveUrl' "$RUNNER_TEMP/build-details.json")"
+          curl --fail --location --retry 3 --silent --show-error "$artifact_url" --output "$ARTIFACT"
           test -s "$ARTIFACT"
+          unzip -tq "$ARTIFACT"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
