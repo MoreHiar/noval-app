@@ -16,6 +16,7 @@ jobs:
   build:
     name: Build ${{ matrix.platform }}
     runs-on: ubuntu-latest
+    environment: EXPO_TOKEN
     strategy:
       fail-fast: false
       matrix:
