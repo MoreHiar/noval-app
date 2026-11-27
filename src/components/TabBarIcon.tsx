@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-export type TabBarIconName = 'search' | 'profile' | 'sources' | 'bookshelf' | 'novels' | 'comics';
+export type TabBarIconName = 'search' | 'profile' | 'sources' | 'bookshelf' | 'novels' | 'comics' | 'dramas';
 
 // Keep the paths aligned with the standalone SVGs in assets/icons/tabbar.
 const paths: Record<TabBarIconName, string[]> = {
@@ -29,6 +29,10 @@ const paths: Record<TabBarIconName, string[]> = {
   comics: [
     'M4 3.5h16v17H4z',
     'M4 10h16M12 10v10.5M8 7h.01M15 15h2',
+  ],
+  dramas: [
+    'M3.5 5.5h17v13h-17z',
+    'm10 9 5 3-5 3z',
   ],
 };
 

@@ -36,6 +36,10 @@ function AppNavigation() {
           <Stack.Screen name="book/[sourceId]/[bookId]" options={{ title: '书籍详情' }} />
           <Stack.Screen name="reader/[sourceId]/[bookId]/[chapterId]" options={{ headerShown: false, gestureEnabled: false, animation: 'none' }} />
           <Stack.Screen name="comic/[sourceId]/[bookId]/[chapterId]" options={{ headerShown: false, gestureEnabled: false, animation: 'none' }} />
+          <Stack.Screen name="drama/index" options={{ headerShown: false }} />
+          <Stack.Screen name="drama/settings" options={{ title: '短剧设置' }} />
+          <Stack.Screen name="drama/[seriesId]" options={{ title: '短剧详情' }} />
+          <Stack.Screen name="drama/[seriesId]/[videoId]" options={{ headerShown: false }} />
         </Stack>
         <SourceBrowser />
       </LibraryProvider>

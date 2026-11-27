@@ -59,7 +59,9 @@
       "expo-sharing",
       "expo-sqlite",
       "expo-system-ui",
-      "expo-image"
+      "expo-image",
+      "expo-video",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

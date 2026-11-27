@@ -46,6 +46,14 @@ export default function ProfileScreen() {
           <View style={styles.sourceCopy}><Text style={styles.sourceEntryTitle}>本机阅读进度</Text><Text style={styles.sourceEntryHint}>打开作品即可继续阅读</Text></View>
         </View>
       </View>
+      <View style={styles.sourceSection}>
+        <Text style={styles.sectionTitle}>短剧</Text>
+        <Pressable style={styles.sourceEntry} onPress={() => router.push('/drama')} accessibilityRole="button" accessibilityLabel="打开短剧">
+          <View style={styles.sourceIcon}><TabBarIcon name="dramas" color={styles.sourceIconText.color} size={18} /></View>
+          <View style={styles.sourceCopy}><Text style={styles.sourceEntryTitle}>打开短剧</Text><Text style={styles.sourceEntryHint}>浏览、搜索和播放短剧预览</Text></View>
+          <Text style={styles.sourceChevron}>›</Text>
+        </Pressable>
+      </View>
       <View style={styles.appearance}>
         <Text style={styles.sectionTitle}>外观</Text>
         <Pressable style={styles.sourceEntry} onPress={() => setAppearanceExpanded(value => !value)} accessibilityRole="button" accessibilityLabel={`外观，${activeAppearance.label}`} accessibilityState={{ expanded: appearanceExpanded }}>
