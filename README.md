@@ -27,6 +27,7 @@ Web 浏览器源需要 Node 服务和 Playwright 浏览器。开发机优先使�
 
 没有付费 Apple 开发者账号时，可使用 `unsigned-ios` 云构建配置生成供个人重新签名的 iPhone IPA；安装前仍需签名，详见 [iOS 打包说明](docs/ios-packaging.md)。
 
+推送 `v` 开头的 Git tag（例如 `v1.0.1`）会触发 GitHub Actions，分别使用 `preview` 和 `unsigned-ios` profile 构建 Android APK 与未签名 iOS IPA，并将两个文件附加到该 tag 对应的 GitHub Release。首次使用前，在 [Expo Access Tokens](https://expo.dev/settings/access-tokens) 创建 token，并在仓库的 Settings → Secrets and variables → Actions 中将它保存为 `EXPO_TOKEN` secret。
 
 ```bash
 # Android APK（打包后直接安装）：

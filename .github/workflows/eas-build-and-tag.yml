@@ -1,0 +1,98 @@
+name: Build mobile releases
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android
+            profile: preview
+            artifact: Noval-android.apk
+          - platform: ios
+            profile: unsigned-ios
+            artifact: Noval-ios-unsigned.ipa
+    steps:
+      - name: Check out tag
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build and download ${{ matrix.platform }} artifact
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          PROFILE: ${{ matrix.profile }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -euo pipefail
+
+          eas build --platform "$PLATFORM" --profile "$PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/build.json"
+          build_id="$(jq -er '.[0].id' "$RUNNER_TEMP/build.json")"
+          eas build:download --build-id "$build_id" --json > "$RUNNER_TEMP/download.json"
+          build_path="$(jq -er '.path' "$RUNNER_TEMP/download.json")"
+          cp "$build_path" "$ARTIFACT"
+          test -s "$ARTIFACT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-build
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach APK and IPA to tag release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" \
+              dist/Noval-android.apk \
+              dist/Noval-ios-unsigned.ipa \
+              --clobber
+          else
+            gh release create "$TAG_NAME" \
+              dist/Noval-android.apk \
+              dist/Noval-ios-unsigned.ipa \
+              --title "Noval $TAG_NAME" \
+              --generate-notes
+          fi
